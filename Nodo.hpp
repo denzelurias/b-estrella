@@ -10,7 +10,7 @@ struct Nodo {
 
     T* claves_;
     Nodo** hijos_;
-    int numClaves_;
+    int num_claves_;
     bool es_hoja_;
 };
 
