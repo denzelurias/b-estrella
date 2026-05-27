@@ -5,13 +5,15 @@
 // Implementación de la estructura Nodo
 template <typename T>
 struct Nodo {
-    Nodo();
-    ~Nodo();
 
+    Nodo(unsigned int orden, bool es_hoja); //Constructor
+    ~Nodo(); //Destructor
     T* claves_;
     Nodo** hijos_;
     int num_claves_;
     bool es_hoja_;
+
+
 };
 
 #include "Nodo.tpp"
