@@ -7,7 +7,10 @@ template <typename T>
 class ArbolBEstrella {
 public:
     ArbolBEstrella(unsigned int orden);
+    ArbolBEstrella(const ArbolBEstrella &arbol);
+    ArbolBEstrella& operator=(const ArbolBEstrella &arbol);
     ~ArbolBEstrella();
+
     bool buscar(T clave) const; //
     bool insertar(T clave); // Hecho por Marco en pseudocodigo
     void imprimir() const; // Que lo haga la ia
@@ -23,6 +26,7 @@ private:
     Nodo<T> *raiz_;
     bool buscar(Nodo<T> *subraiz, T clave, Nodo<T>* &auxiliar, int &indice) const;
     void destruir(Nodo<T>* nodo);
+    Nodo<T>* copiarNodo(Nodo<T> *nodo);
     //Función redistribuir
     //Función dividir
     //

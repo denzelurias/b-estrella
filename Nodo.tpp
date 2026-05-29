@@ -21,3 +21,8 @@ Nodo<T>::~Nodo() {
     delete[] hijos_;
 }
 
+template<typename T>
+Nodo<T>& Nodo<T>::operator=(const Nodo<T> &nodo) {
+
+}
+

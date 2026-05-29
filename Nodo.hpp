@@ -8,8 +8,11 @@ struct Nodo {
 
     Nodo(unsigned int orden, bool es_hoja); //Constructor
     ~Nodo(); //Destructor
+    Nodo<T>& operator=(const Nodo<T> &nodo);
+
     T* claves_;
-    Nodo** hijos_;
+    Nodo *padre_;
+    Nodo **hijos_;
     int num_claves_;
     bool es_hoja_;
 

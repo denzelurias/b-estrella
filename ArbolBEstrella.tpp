@@ -1,8 +1,30 @@
+#include <iostream>
+#include <new>
+
 // Métodos públicos
 
 //Constructor
 template<typename T>
 ArbolBEstrella<T>::ArbolBEstrella(unsigned int orden) : orden_(orden), max_claves_(orden - 1), raiz_(nullptr) {}
+
+template<typename T>
+ArbolBEstrella<T>::ArbolBEstrella(const ArbolBEstrella &arbol) {
+    *this = arbol;
+}
+
+template<typename T>
+ArbolBEstrella<T>& ArbolBEstrella<T>::operator=(const ArbolBEstrella &arbol) {
+    if (this == &arbol) return *this;
+
+    destruir(this->raiz_);
+
+    this->orden_ = arbol.orden_;
+    this->max_claves_ = arbol.max_claves_;
+    this->raiz_ = copiarNodo(arbol.raiz_);
+
+    return *this;
+}
+
 
 //Buscar Público
 template<typename T>
@@ -57,3 +79,26 @@ bool ArbolBEstrella<T>::buscar(Nodo<T> *subraiz, T clave, Nodo<T>* &auxiliar, in
     return buscar(subraiz->hijos_[i], clave, auxiliar, indice);
 }
 
+template<typename T>
+Nodo<T>* ArbolBEstrella<T>::copiarNodo(Nodo<T> *nodo) {
+    if (nodo == nullptr) return;
+
+    Nodo<T> *nuevo = nullptr;
+    try {
+        nuevo = new Nodo<T>(this->orden_, nodo->es_hoja_);
+    }
+    catch (const std::bad_alloc& mensaje) {
+        std::cerr << "Falla de alojamiento de memoria:" << mensaje.what();
+    }
+    nuevo->num_claves_ = nodo->num_claves_;
+
+    for (int i = 0; i < nodo->numClaves; i++) {
+        nuevo->claves_[i] = nodo->claves_[i];
+    }
+
+    for (int i = 0; i < nuevo->num_claves_ + 1; i++) {
+        nuevo->hijos_[i] = copiarNodo(nodo->hijos_[i]);
+    }
+
+    return nuevo;
+}
