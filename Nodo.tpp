@@ -4,7 +4,8 @@ Nodo<T>::Nodo(unsigned int orden, bool es_hoja){
     int max_claves = orden - 1;
 
     this->claves_ = new T[max_claves + 1]; // Espacio extra para el overflow de claves
-    this->hijos_ = new Nodo *[orden + 1]; // Espacio extra para el overflow de claves
+    this->padre_ = nullptr;
+    this->hijos_ = new Nodo<T> *[orden + 1]; // Espacio extra para el overflow de claves
 
     this-> num_claves_ = 0;
     this->es_hoja_ = es_hoja;
@@ -14,15 +15,9 @@ Nodo<T>::Nodo(unsigned int orden, bool es_hoja){
     }
 
 }
-//Destructor
+//Destructorno
 template<typename T>
 Nodo<T>::~Nodo() {
     delete[] claves_;
     delete[] hijos_;
 }
-
-template<typename T>
-Nodo<T>& Nodo<T>::operator=(const Nodo<T> &nodo) {
-
-}
-
