@@ -17,14 +17,12 @@ ArbolBEstrella<T>& ArbolBEstrella<T>::operator=(const ArbolBEstrella &arbol) {
     if (this == &arbol) return *this;
 
     destruir(this->raiz_);
+    this->raiz_ = nullptr;
 
-    if (this->raiz_ != nullptr) {
-        this->raiz_->padre_ = nullptr;
-    }
     this->orden_ = arbol.orden_;
     this->max_claves_ = arbol.max_claves_;
     this->raiz_ = copiarNodo(arbol.raiz_);
-
+    
     return *this;
 }
 
