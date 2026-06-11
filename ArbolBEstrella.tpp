@@ -108,3 +108,118 @@ Nodo<T>* ArbolBEstrella<T>::copiarNodo(Nodo<T> *nodo) {
 
     return nuevo;
 }
+
+//Función privada fusionar
+template <typename T>
+void ArbolBEstrella<T>:: fusionar(Nodo<T> *padre, int indice) {
+
+    //Creamos nodos para trabajar más fácil con los hijos
+    Nodo<T> *izq = padre->hijos_[indice];
+    Nodo<T> *medio = padre->hijos_[indice +1];
+    Nodo<T> *der = padre->hijos_[indice+2];
+
+    // Guardamos todas las claves(del padre y de los hijos) en un arreglo epicamente
+    T temp [3 * orden_ - 1]; //Formula para saber el tamaño del arreglo epica
+    int pos = 0; //Variable para saber la pos de las claves que guardamos
+
+    //Guardamos todas las claves del lado izquierdo
+    for (int i = 0; i < izq->num_claves_; ++i) {
+        temp[pos++] = izq->claves_[i];
+    }
+
+    //Guardamos la clave del padre
+    temp[pos++] = padre->claves_[indice];
+
+    //Guardamos las claves de en medio
+    for (int i = 0; i < medio->num_claves_; ++i) {
+        temp[pos++] = medio->claves_[i];
+    }
+
+    //Guardamos la segunda clave separadora del padre
+    temp[pos++] = padre->claves_[indice + 1];
+
+    //Guardamos las claves del hijo del lado derecho
+    for (int i = 0;  i < der->num_claves_; ++i) {
+        temp[pos++] = der->claves_[i];
+    }
+
+    //Parte 2 epicamente identifico la clave del arreglo para mover  y sea el nuevo padre
+    padre->claves_[indice] = temp[pos/2];
+
+    //Actualizamos las claves del padre
+    for (int i = indice + 1; i < padre->num_claves_ -1; ++i) {
+        padre->claves_[i] = padre->claves_[i+1];
+    }
+
+    //Recorremos los punteros hijos del padre hacia la izquierda
+    for (int i = indice + 2; i< padre->num_claves_; ++i ) {
+        padre ->hijos_[i] = padre -> hijos_[i+1];
+    }
+    //Reducimos el número de claves
+    padre->num_claves_--;
+
+    //Limpiamos el puntero colgante del hijo eliminado
+    padre->hijos_[padre ->num_claves_ + 1] = nullptr;
+
+    //mandamos al lado izquierdo las claves que estamos reorganizando
+    for (int i = 0; i < pos/2 ; ++i) {
+        izq->claves_[i] = temp[i];
+    }
+
+    //Actualizamos cuantas claves tiene el lado izq
+    izq->num_claves_ = pos/2;
+    int j = 0; // Variable para que sepa la pos de las claves el nodo de en medio
+    for (int i = pos/2 + 1; i < pos; ++i) {
+        medio->claves_[j++] = temp[i];
+    }
+
+    medio->num_claves_ = j; //ahora con j sabemos cuantas claves tiene el nodo de en medio
+
+    // Actualizamos los hijos
+    //Basicamente lo mismo que lo anterior pero con los hijos
+    Nodo<T> *temp_hijos [3 * orden_]; //El tamaño del arreglo es 1 más
+    pos = 0;
+    j = 0;
+
+    // Metemos todos los punteros a hijos en un arreglo
+
+    // todo del lado izquierdo
+    for (int i = 0; i <= izq->num_claves_; ++i) {
+        temp_hijos[pos++] = izq->hijos_[i];
+    }
+
+    // todo de en medio
+    for (int i = 0; i <= medio->num_claves_; ++i) {
+        temp_hijos[pos++] = medio->hijos_[i];
+    }
+
+    // todo del lado derecho
+    for (int i = 0; i <= der->num_claves_; ++i) {
+        temp_hijos[pos++] = der->hijos_[i];
+    }
+
+    // Redistribuimos los punteros a hijos
+
+    //Primero del lado izquierdo
+    for (int i = 0; i <= izq->num_claves_; ++i) {
+        izq->hijos_[i] = temp_hijos[i];
+        // Les decimos que tienen nuevo padre a cada hijo del lado izquierdo
+        if (temp_hijos[i] != nullptr) {
+            temp_hijos[i]->padre_ = izq;
+        }
+    }
+
+    int k = 0;
+    for (int i = izq->num_claves_ + 1; i < pos; ++i ) {
+        medio->hijos_[k++] = temp_hijos[i];
+        //Les decimos que tienen nuevo padre a cada hijo del lado de en medio
+        if (temp_hijos[i] != nullptr) {
+            temp_hijos[i]->padre_ = medio;
+        }
+    }
+
+    //Borramos el lado derecho
+    delete der;
+
+
+}

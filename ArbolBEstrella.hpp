@@ -13,11 +13,9 @@ public:
 
     bool buscar(T clave) const; //
     bool insertar(T clave); // Hecho por Marco en pseudocodigo
-    void imprimir() const; // Que lo haga la ia
-    //Funcion eliminar
-
-
-
+    void imprimir() const; // Ojaldrez
+    //Funcion eliminar - Ojaldrez
+    // Operador igual - Denzel
 
 
 private:
@@ -29,7 +27,9 @@ private:
     Nodo<T>* copiarNodo(Nodo<T> *nodo);
     //Función redistribuir
     //Función dividir
-    //
+    void fusionar(Nodo<T> *padre, int indice);
+    //Función Fusionar/merge - mia
+
 };
 
 #include "ArbolBEstrella.tpp"
