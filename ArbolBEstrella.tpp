@@ -1,3 +1,4 @@
+#include "ArbolBEstrella.hpp"
 #include <iostream>
 #include <new>
 
@@ -61,6 +62,7 @@ bool ArbolBEstrella<T>::buscar(Nodo<T> *subraiz, T clave, Nodo<T>* &auxiliar, in
     if (subraiz == nullptr) {
         return false;
     }
+
     int i = 0;
     while (i < subraiz->num_claves_ && clave > subraiz->claves_[i]) {
         i++;
@@ -118,8 +120,14 @@ void ArbolBEstrella<T>:: fusionar(Nodo<T> *padre, int indice) {
     Nodo<T> *medio = padre->hijos_[indice +1];
     Nodo<T> *der = padre->hijos_[indice+2];
 
+    //Guardamos los conteos originales de claves antes de modificarlos,
+    //los necesitamos para recolectar correctamente los hijos más adelante
+    int n_izq = izq->num_claves_;
+    int n_medio = medio->num_claves_;
+    int n_der = der->num_claves_;
+
     // Guardamos todas las claves(del padre y de los hijos) en un arreglo epicamente
-    T temp [3 * orden_ - 1]; //Formula para saber el tamaño del arreglo epica
+    T *temp = new T[3 * orden_ - 1]; //Formula para saber el tamaño del arreglo epica
     int pos = 0; //Variable para saber la pos de las claves que guardamos
 
     //Guardamos todas las claves del lado izquierdo
@@ -177,24 +185,25 @@ void ArbolBEstrella<T>:: fusionar(Nodo<T> *padre, int indice) {
 
     // Actualizamos los hijos
     //Basicamente lo mismo que lo anterior pero con los hijos
-    Nodo<T> *temp_hijos [3 * orden_]; //El tamaño del arreglo es 1 más
+    Nodo<T> **temp_hijos = new Nodo<T> *[3 * orden_]; //El tamaño del arreglo es 1 más
     pos = 0;
     j = 0;
 
     // Metemos todos los punteros a hijos en un arreglo
+    // Usamos los conteos ORIGINALES porque izq y medio aún conservan sus hijos viejos
 
     // todo del lado izquierdo
-    for (int i = 0; i <= izq->num_claves_; ++i) {
+    for (int i = 0; i <= n_izq; ++i) {
         temp_hijos[pos++] = izq->hijos_[i];
     }
 
     // todo de en medio
-    for (int i = 0; i <= medio->num_claves_; ++i) {
+    for (int i = 0; i <= n_medio; ++i) {
         temp_hijos[pos++] = medio->hijos_[i];
     }
 
     // todo del lado derecho
-    for (int i = 0; i <= der->num_claves_; ++i) {
+    for (int i = 0; i <= n_der; ++i) {
         temp_hijos[pos++] = der->hijos_[i];
     }
 
@@ -221,5 +230,8 @@ void ArbolBEstrella<T>:: fusionar(Nodo<T> *padre, int indice) {
     //Borramos el lado derecho
     delete der;
 
+    //Liberamos los arreglos temporales que reservamos dinámicamente
+    delete[] temp;
+    delete[] temp_hijos;
 
 }

@@ -28,7 +28,6 @@ private:
     //Función redistribuir
     //Función dividir
     void fusionar(Nodo<T> *padre, int indice);
-    //Función Fusionar/merge - mia
 
 };
 
