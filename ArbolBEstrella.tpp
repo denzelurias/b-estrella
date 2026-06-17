@@ -692,3 +692,275 @@ bool ArbolBEstrella<T>::insertar(T clave)
         throw MemoriaInsuficiente();
     }
 }
+
+template <typename T>
+void ArbolBEstrella<T>::imprimir() const { imprimir(raiz_, 0); }
+
+template <typename T>
+void ArbolBEstrella<T>::imprimir(Nodo<T> *nodo, int nivel) const {
+    if (nodo == nullptr) return;
+
+    for (int i = nodo->num_claves_ - 1; i >= 0; --i) {
+        imprimir(nodo->hijos_[i + 1], nivel + 1);
+        for (int j = 0; j < nivel; ++j) std::cout << "    ";
+        std::cout << nodo->claves_[i] << std::endl;
+    }
+
+    imprimir(nodo->hijos_[0], nivel + 1);
+}
+
+template <typename T>
+bool ArbolBEstrella<T>::eliminar(T clave) {
+    if (raiz_ == nullptr) return false;
+    return eliminar(raiz_, clave);
+}
+
+template <typename T>
+bool ArbolBEstrella<T>::esDeficiente(Nodo<T> *nodo) const { return nodo->num_claves_ < (orden_ - 1) / 2; }
+
+template <typename T>
+T ArbolBEstrella<T>::obtenerSucesor(Nodo<T> *nodo, int indice) const {
+    Nodo<T> *actual = nodo->hijos_[indice + 1];
+    while (!actual->es_hoja_) actual = actual->hijos_[0];
+
+    return actual->claves_[0];
+}
+
+template <typename T>
+T ArbolBEstrella<T>::obtenerPredecesor(Nodo<T> *nodo, int indice) const {
+    Nodo<T> *actual = nodo->hijos_[indice];
+    while (!actual->es_hoja_) actual = actual->hijos_[actual->num_claves_];
+
+    return actual->claves_[actual->num_claves_ - 1];
+}
+
+template <typename T>
+void ArbolBEstrella<T>::corregirDeficiencia(Nodo<T> *nodo_padre, int indice_hijo) {
+    Nodo<T> *hijo_deficiente = nodo_padre->hijos_[indice_hijo];
+    
+    if (indice_hijo > 0) {
+        Nodo<T> *hermano_izq = nodo_padre->hijos_[indice_hijo - 1];
+        if (hermano_izq->num_claves_ > (orden_ - 1) / 2) {
+            redistribuir(nodo_padre, hermano_izq, hijo_deficiente, indice_hijo - 1);
+            return;
+        }
+    }
+
+    if (indice_hijo < nodo_padre->num_claves_) {
+        Nodo<T> *hermano_der = nodo_padre->hijos_[indice_hijo + 1];
+        if (hermano_der->num_claves_ > (orden_ - 1) / 2) {
+            redistribuir(nodo_padre, hijo_deficiente, hermano_der, indice_hijo);
+            return;
+        }
+    }
+
+    if (indice_hijo > 0 && indice_hijo < nodo_padre->num_claves_) {
+        Nodo<T> *hermano_izq = nodo_padre->hijos_[indice_hijo - 1];
+        Nodo<T> *hermano_der = nodo_padre->hijos_[indice_hijo + 1];
+
+        int num_claves_izq = hermano_izq->num_claves_;
+        int num_claves_hijo = hijo_deficiente->num_claves_;
+        int num_claves_der = hermano_der->num_claves_;
+
+        T *arreglo_aux = new T[num_claves_izq + num_claves_hijo + num_claves_der + 2];
+        int pos = 0;
+
+        for (int i = 0; i < num_claves_izq; ++i) arreglo_aux[pos++] = hermano_izq->claves_[i];
+        arreglo_aux[pos++] = nodo_padre->claves_[indice_hijo - 1];
+
+        for (int i = 0; i < num_claves_hijo; ++i) arreglo_aux[pos++] = hijo_deficiente->claves_[i];
+        arreglo_aux[pos++] = nodo_padre->claves_[indice_hijo];
+
+        for (int i = 0; i < num_claves_der; ++i) arreglo_aux[pos++] = hermano_der->claves_[i];
+
+        int total_hijos = num_claves_izq + 1 + num_claves_hijo + 1 + num_claves_der + 1;
+        Nodo<T> **hijos_aux = new Nodo<T>*[total_hijos];
+        int pos_h = 0;
+
+        if (!hermano_izq->es_hoja_) {
+            for (int i = 0; i <= num_claves_izq; ++i) hijos_aux[++pos_h] = hermano_izq->hijos_[i];
+            for (int i = 0; i <= num_claves_hijo; ++i) hijos_aux[++pos_h] = hijo_deficiente->hijos_[i];
+            for (int i = 0; i <= num_claves_der; ++i) hijos_aux[++pos_h] = hermano_der->hijos_[i];
+        }
+
+        int claves_a_repartir = pos - 2;
+        int claves_izq_nuevo = claves_a_repartir / 2;
+        int claves_der_nuevo = claves_a_repartir - claves_izq_nuevo;
+        int indice_sep = claves_izq_nuevo;
+
+        for (int i = 0; i < claves_izq_nuevo; ++i) hermano_izq->claves_[i] = arreglo_aux[i];
+        hermano_izq->num_claves_ = claves_izq_nuevo;
+
+        if (!hermano_izq->es_hoja_) {
+            for (int i = 0; i <= claves_izq_nuevo; ++i) {
+                hermano_izq->hijos_[i] = hijos_aux[i];
+                if (hijos_aux[i] != nullptr) hijos_aux[i]->padre_ = hermano_izq;
+            }
+        }
+
+        nodo_padre->claves_[indice_hijo - 1] = arreglo_aux[indice_sep];
+
+        for (int i = 0; i < claves_der_nuevo; ++i) hermano_der->claves_[i] = arreglo_aux[indice_sep + 1 + i];
+        hermano_der->num_claves_ = claves_der_nuevo;
+
+        if (hermano_izq->es_hoja_ == false) {
+            for (int i = 0; i <= claves_der_nuevo; ++i) {
+                hermano_der->hijos_[i] = hijos_aux[claves_izq_nuevo + 1 + i];
+                if (hijos_aux[claves_izq_nuevo + 1 + i] != nullptr) hijos_aux[claves_izq_nuevo + 1 + i]->padre_ = hermano_der;
+            }
+        }
+
+        for (int i = indice_hijo; i < nodo_padre->num_claves_ - 1; ++i) {
+            nodo_padre->claves_[i] = nodo_padre->claves_[i + 1];
+        }
+        for (int i = indice_hijo; i < nodo_padre->num_claves_; ++i) {
+            nodo_padre->hijos_[i] = nodo_padre->hijos_[i + 1];
+        }
+        nodo_padre->hijos_[nodo_padre->num_claves_] = nullptr;
+        nodo_padre->num_claves_--;
+
+        delete hijo_deficiente;
+        delete[] arreglo_aux;
+        delete[] hijos_aux;
+
+    } else if (indice_hijo > 0) {
+        Nodo<T> *hermano_izq = nodo_padre->hijos_[indice_hijo - 1];
+
+        int num_claves_izq = hermano_izq->num_claves_;
+        int num_claves_hijo = hijo_deficiente->num_claves_;
+
+        hermano_izq->claves_[num_claves_izq] = nodo_padre->claves_[indice_hijo - 1];
+
+        for (int i = 0; i < num_claves_hijo; ++i) {
+            hermano_izq->claves_[num_claves_izq + 1 + i] = hijo_deficiente->claves_[i];
+        }
+
+        if (hermano_izq->es_hoja_ == false) {
+            for (int i = 0; i <= num_claves_hijo; ++i) {
+                hermano_izq->hijos_[num_claves_izq + 1 + i] = hijo_deficiente->hijos_[i];
+                if (hijo_deficiente->hijos_[i] != nullptr) hijo_deficiente->hijos_[i]->padre_ = hermano_izq;
+            }
+        }
+
+        hermano_izq->num_claves_ = num_claves_izq + 1 + num_claves_hijo;
+
+        for (int i = indice_hijo - 1; i < nodo_padre->num_claves_ - 1; ++i) {
+            nodo_padre->claves_[i] = nodo_padre->claves_[i + 1];
+        }
+        for (int i = indice_hijo; i < nodo_padre->num_claves_; ++i) {
+            nodo_padre->hijos_[i] = nodo_padre->hijos_[i + 1];
+        }
+        nodo_padre->hijos_[nodo_padre->num_claves_] = nullptr;
+        nodo_padre->num_claves_--;
+
+        delete hijo_deficiente;
+
+    } else {
+        Nodo<T> *hermano_der = nodo_padre->hijos_[indice_hijo + 1];
+
+        int num_claves_hijo = hijo_deficiente->num_claves_;
+        int num_claves_der = hermano_der->num_claves_;
+
+        hijo_deficiente->claves_[num_claves_hijo] = nodo_padre->claves_[indice_hijo];
+
+        for (int i = 0; i < num_claves_der; ++i) {
+            hijo_deficiente->claves_[num_claves_hijo + 1 + i] = hermano_der->claves_[i];
+        }
+
+        if (hijo_deficiente->es_hoja_ == false) {
+            for (int i = 0; i <= num_claves_der; ++i) {
+                hijo_deficiente->hijos_[num_claves_hijo + 1 + i] = hermano_der->hijos_[i];
+                if (hermano_der->hijos_[i] != nullptr) hermano_der->hijos_[i]->padre_ = hijo_deficiente;
+            }
+        }
+
+        hijo_deficiente->num_claves_ = num_claves_hijo + 1 + num_claves_der;
+
+        for (int i = indice_hijo; i < nodo_padre->num_claves_ - 1; ++i) {
+            nodo_padre->claves_[i] = nodo_padre->claves_[i + 1];
+        }
+        for (int i = indice_hijo + 1; i < nodo_padre->num_claves_; ++i) {
+            nodo_padre->hijos_[i] = nodo_padre->hijos_[i + 1];
+        }
+        nodo_padre->hijos_[nodo_padre->num_claves_] = nullptr;
+        nodo_padre->num_claves_--;
+
+        delete hermano_der;
+    }
+}
+
+template<typename T>
+bool ArbolBEstrella<T>::eliminar(Nodo<T> *subraiz, T clave) {
+    int i = 0;
+    while (i < subraiz->num_claves_ && clave > subraiz->claves_[i]) {
+        i++;
+    }
+
+    if (i < subraiz->num_claves_ && clave == subraiz->claves_[i]) {
+        if (subraiz->es_hoja_ == true) {
+            for (int j = i; j < subraiz->num_claves_ - 1; ++j) {
+                subraiz->claves_[j] = subraiz->claves_[j + 1];
+            }
+            subraiz->num_claves_--;
+
+            if (subraiz == raiz_ && subraiz->num_claves_ == 0) {
+                delete raiz_;
+                raiz_ = nullptr;
+            }
+            return true;
+        }
+
+        Nodo<T> *hijo_izq = subraiz->hijos_[i];
+        Nodo<T> *hijo_der = subraiz->hijos_[i + 1];
+
+        if (hijo_izq->num_claves_ > (orden_ - 1) / 2) {
+            T pred = obtenerPredecesor(subraiz, i);
+            subraiz->claves_[i] = pred;
+            bool resultado = eliminar(hijo_izq, pred);
+
+            if (esDeficiente(hijo_izq)) {
+                corregirDeficiencia(subraiz, i);
+            }
+
+            if (subraiz == raiz_ && subraiz->num_claves_ == 0) {
+                raiz_ = subraiz->hijos_[0];
+                if (raiz_ != nullptr) raiz_->padre_ = nullptr;
+                delete subraiz;
+            }
+            return resultado;
+        }
+
+        T suc = obtenerSucesor(subraiz, i);
+        subraiz->claves_[i] = suc;
+        bool resultado = eliminar(hijo_der, suc);
+
+        if (esDeficiente(hijo_der)) {
+            corregirDeficiencia(subraiz, i + 1);
+        }
+
+        if (subraiz == raiz_ && subraiz->num_claves_ == 0) {
+            raiz_ = subraiz->hijos_[0];
+            if (raiz_ != nullptr) raiz_->padre_ = nullptr;
+            delete subraiz;
+        }
+        return resultado;
+    }
+
+    if (subraiz->es_hoja_ == true) {
+        return false;
+    }
+
+    bool resultado = eliminar(subraiz->hijos_[i], clave);
+
+    if (resultado && esDeficiente(subraiz->hijos_[i])) {
+        corregirDeficiencia(subraiz, i);
+    }
+
+    if (subraiz == raiz_ && subraiz->num_claves_ == 0) {
+        raiz_ = subraiz->hijos_[0];
+        if (raiz_ != nullptr) raiz_->padre_ = nullptr;
+        delete subraiz;
+    }
+
+    return resultado;
+}

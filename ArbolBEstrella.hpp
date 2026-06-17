@@ -15,6 +15,7 @@ public:
     bool buscar(T clave) const; //
     bool insertar(T clave); // Hecho por Marco en pseudocodigo
     void imprimir() const; // Ojaldrez
+    bool eliminar(T clave);
     //Funcion eliminar - Ojaldrez
     // Operador igual - Denzel
 
@@ -42,6 +43,13 @@ private:
     int obtenerIndice(Nodo<T> **arreglo_hijos, int num_hijos, Nodo<T> *nodo_buscado) const;
     int insertarEnOrden(T arreglo[], int num_elem, const T &elem_insertar);
     void insertarEnIndice(Nodo<T> **arreglo_nodos, int num_nodos, Nodo<T> *nodo_insertar, int indice_insercion);
+
+    void imprimir(Nodo<T> *nodo, int nivel) const;
+    bool eliminar(Nodo<T> *subraiz, T clave);
+    T obtenerSucesor(Nodo<T> *nodo, int indice) const;
+    T obtenerPredecesor(Nodo<T> *nodo, int indice) const;
+    bool esDeficiente(Nodo<T> *nodo) const;
+    void corregirDeficiencia(Nodo<T> *nodo_padre, int indice_hijo);
 
 
 
