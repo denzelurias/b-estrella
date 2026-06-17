@@ -2,6 +2,7 @@
 #define B_ESTRELLA_ARBOLBESTRELLA_HPP
 
 #include "Nodo.hpp"
+#include <exception>
 
 template <typename T>
 class ArbolBEstrella {
@@ -17,6 +18,15 @@ public:
     //Funcion eliminar - Ojaldrez
     // Operador igual - Denzel
 
+    //Clase anidada para señalar fallos de reserva de memoria
+    class MemoriaInsuficiente : public std::exception {
+    public:
+        MemoriaInsuficiente() throw();
+        virtual const char* what() const throw();
+    };
+
+
+
 
 private:
     int orden_;
@@ -25,9 +35,16 @@ private:
     bool buscar(Nodo<T> *subraiz, T clave, Nodo<T>* &auxiliar, int &indice) const;
     void destruir(Nodo<T>* nodo);
     Nodo<T>* copiarNodo(Nodo<T> *nodo);
-    //Función redistribuir
-    //Función dividir
+    void redistribuir(Nodo<T> *nodo_padre, Nodo<T> *nodo_hijo_izq, Nodo<T> *nodo_hijo_der, int indice_nodo_hijo_izq);
+    void dividir(Nodo<T> *nodo_padre, Nodo<T> *nodo_hijo_izq, Nodo<T> *nodo_hijo_der, int indice_nodo_hijo_izq);
     void fusionar(Nodo<T> *padre, int indice);
+    void dividirRaiz(Nodo<T> *vieja_raiz);
+    int obtenerIndice(Nodo<T> **arreglo_hijos, int num_hijos, Nodo<T> *nodo_buscado) const;
+    int insertarEnOrden(T arreglo[], int num_elem, const T &elem_insertar);
+    void insertarEnIndice(Nodo<T> **arreglo_nodos, int num_nodos, Nodo<T> *nodo_insertar, int indice_insercion);
+
+
+
 
 };
 
