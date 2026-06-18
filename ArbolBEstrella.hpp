@@ -16,6 +16,8 @@ public:
     bool insertar(T clave); // Hecho por Marco en pseudocodigo
     void imprimir() const; // Ojaldrez
     bool eliminar(T clave);
+    void vaciar();
+
     //Funcion eliminar - Ojaldrez
     // Operador igual - Denzel
 
@@ -50,6 +52,10 @@ private:
     T obtenerPredecesor(Nodo<T> *nodo, int indice) const;
     bool esDeficiente(Nodo<T> *nodo) const;
     void corregirDeficiencia(Nodo<T> *nodo_padre, int indice_hijo);
+
+    int minimoClaves() const;
+    void ajustarRaizDespuesDeEliminar();
+    void fusionarDosHijos(Nodo<T> *nodo_padre, int indice_hijo_izq);
 
 
 
