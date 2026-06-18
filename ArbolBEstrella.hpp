@@ -134,6 +134,18 @@ public:
      */
     void imprimir() const;
 
+    /**
+     * \brief Imprime las claves del árbol de izquierda a derecha.
+     *
+     * Realiza un recorrido in-order generalizado para árboles B/B*.
+     * Esto significa que visita primero el hijo izquierdo de cada clave,
+     * después imprime la clave, y finalmente continúa con el siguiente hijo.
+     *
+     * La salida muestra las claves en orden ascendente, separadas por espacios.
+     * Si el árbol está vacío, imprime el mensaje "Árbol vacío".
+     */
+    void imprimirIzquierdaDerecha() const;
+
 private:
     int orden_;        ///< Orden del árbol; corresponde al máximo de hijos por nodo.
     int max_claves_;   ///< Número máximo de claves permitidas por nodo.
@@ -323,6 +335,24 @@ private:
      * \param nivel int Nivel de profundidad usado para indentar.
      */
     void imprimir(Nodo<T> *nodo, int nivel) const;
+
+    /**
+     * \brief Función auxiliar recursiva para imprimir el árbol de izquierda a derecha.
+     *
+     * Recorre el subárbol recibido siguiendo el orden:
+     *
+     * hijo[0], clave[0], hijo[1], clave[1], ..., clave[k-1], hijo[k]
+     *
+     * donde k es el número de claves del nodo actual.
+     *
+     * \param nodo Nodo<T>* Nodo actual desde el cual se continúa el recorrido.
+     * \param primero bool& Bandera que indica si todavía no se ha impreso ninguna clave.
+     *
+     * \note El parámetro @a primero se pasa por referencia para conservar su valor
+     * durante todas las llamadas recursivas y evitar imprimir separadores extra.
+     */
+    void imprimirIzquierdaDerecha(Nodo<T> *nodo, bool &primero) const;
+
 };
 
 #include "ArbolBEstrella.tpp"

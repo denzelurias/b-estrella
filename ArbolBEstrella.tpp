@@ -210,6 +210,35 @@ void ArbolBEstrella<T>::vaciar() {
 template <typename T>
 void ArbolBEstrella<T>::imprimir() const { imprimir(raiz_, 0); }
 
+// ------------------------------------------------------- //
+/**
+ * \brief Imprime todas las claves del árbol de izquierda a derecha.
+ *
+ * Si el árbol no está vacío, inicia un recorrido recursivo desde la raíz.
+ * El recorrido imprime las claves en orden ascendente, separadas por espacios.
+ *
+ * Si la raíz es nullptr, significa que el árbol está vacío y se imprime
+ * un mensaje indicándolo.
+ */
+template <typename T>
+void ArbolBEstrella<T>::imprimirIzquierdaDerecha() const {
+    // Bandera auxiliar para saber si se está imprimiendo la primera clave.
+    // Se usa para evitar imprimir un espacio antes del primer elemento.
+    bool primero = true;
+
+    // Si no existe raíz, el árbol no contiene claves.
+    if (raiz_ == nullptr) {
+        std::cout << "Árbol vacío" << std::endl;
+        return;
+    }
+
+    // Iniciamos el recorrido recursivo desde la raíz del árbol.
+    imprimirIzquierdaDerecha(raiz_, primero);
+
+    // Salto de línea final para dejar la salida limpia en consola.
+    std::cout << std::endl;
+}
+
 // ============================================================================
 //  Manejo de memoria y copia
 // ============================================================================
@@ -1298,3 +1327,56 @@ void ArbolBEstrella<T>::imprimir(Nodo<T> *nodo, int nivel) const {
     imprimir(nodo->hijos_[0], nivel + 1);
 }
 
+// ------------------------------------------------------- //
+/**
+ * \brief Recorre recursivamente un subárbol e imprime sus claves en orden ascendente.
+ *
+ * En un árbol B/B*, cada nodo puede tener varias claves y varios hijos.
+ * Para imprimir de izquierda a derecha, se sigue el patrón:
+ *
+ * hijo[0], clave[0], hijo[1], clave[1], ..., clave[k-1], hijo[k]
+ *
+ * donde k representa el número de claves del nodo.
+ *
+ * \param nodo Nodo<T>* Nodo actual del recorrido.
+ * \param primero bool& Bandera que indica si aún no se ha impreso ninguna clave.
+ */
+template <typename T>
+void ArbolBEstrella<T>::imprimirIzquierdaDerecha(Nodo<T> *nodo, bool &primero) const {
+    // Caso base: si el nodo no existe, no hay nada que recorrer ni imprimir.
+    if (nodo == nullptr) {
+        return;
+    }
+
+    // Recorremos cada clave del nodo actual.
+    for (int i = 0; i < nodo->num_claves_; ++i) {
+        // Antes de imprimir la clave actual, visitamos su hijo izquierdo.
+        //
+        // En un nodo interno, hijos_[i] contiene las claves menores
+        // que claves_[i] y mayores que la clave anterior.
+        if (!nodo->es_hoja_) {
+            imprimirIzquierdaDerecha(nodo->hijos_[i], primero);
+        }
+
+        // Si no es la primera clave impresa, agregamos un espacio separador.
+        if (!primero) {
+            std::cout << " ";
+        }
+
+        // Imprimimos la clave actual.
+        std::cout << nodo->claves_[i];
+
+        // Después de imprimir la primera clave, la bandera se mantiene en false
+        // durante el resto del recorrido recursivo.
+        primero = false;
+    }
+
+    // Después de imprimir todas las claves del nodo, todavía falta recorrer
+    // el último hijo derecho.
+    //
+    // Si el nodo tiene k claves, entonces puede tener k + 1 hijos.
+    // Por eso el último hijo está en hijos_[num_claves_].
+    if (!nodo->es_hoja_) {
+        imprimirIzquierdaDerecha(nodo->hijos_[nodo->num_claves_], primero);
+    }
+}
