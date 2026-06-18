@@ -1,17 +1,50 @@
+/**
+ * @file ArbolBEstrella.tpp
+ * @brief Implementación de la plantilla de clase ArbolBEstrella<>.
+ *
+ * Contiene las definiciones de las operaciones públicas del árbol B* y de los
+ * auxiliares privados para búsqueda, inserción, eliminación, balanceo, copia y
+ * liberación de memoria.
+ *
+ * @date 18/06/2026
+ */
+
 #include <iostream>
 #include <new>
 
-// Métodos públicos
+// ============================================================================
+//  Implementación de clases de excepción
+// ============================================================================
 
-//Constructor
+/** \brief Constructor de la excepción MemoriaInsuficiente. */
+template <typename T>
+ArbolBEstrella<T>::MemoriaInsuficiente::MemoriaInsuficiente() throw(){}
+
+// ------------------------------------------------------- //
+/** \brief Devuelve el mensaje asociado a MemoriaInsuficiente. */
+template <typename T>
+const char* ArbolBEstrella<T>::MemoriaInsuficiente::what() const throw()
+{
+    return "Memoria insuficiente";
+}
+
+// ============================================================================
+//  Regla de los tres
+// ============================================================================
+
+/** \brief Inicializa un árbol B* vacío con el orden indicado. */
 template<typename T>
 ArbolBEstrella<T>::ArbolBEstrella(unsigned int orden) : orden_(orden), max_claves_(orden - 1), raiz_(nullptr) {}
 
+// ------------------------------------------------------- //
+/** \brief Construye una copia profunda de otro árbol B*. */
 template<typename T>
 ArbolBEstrella<T>::ArbolBEstrella(const ArbolBEstrella &arbol) : orden_(arbol.orden_), max_claves_(arbol.orden_ - 1), raiz_(nullptr) {
     *this = arbol;
 }
 
+// ------------------------------------------------------- //
+/** \brief Asigna al árbol actual una copia profunda de otro árbol B*. */
 template<typename T>
 ArbolBEstrella<T>& ArbolBEstrella<T>::operator=(const ArbolBEstrella &arbol) {
     if (this == &arbol) return *this;
@@ -26,8 +59,18 @@ ArbolBEstrella<T>& ArbolBEstrella<T>::operator=(const ArbolBEstrella &arbol) {
     return *this;
 }
 
+// ------------------------------------------------------- //
+/** \brief Libera todos los nodos pertenecientes al árbol. */
+template<typename T>
+ArbolBEstrella<T>::~ArbolBEstrella() {
+    destruir(raiz_);
+}
 
-//Buscar Público
+// ============================================================================
+//  Métodos públicos
+// ============================================================================
+
+/** \brief Busca una clave desde la raíz del árbol. */
 template<typename T>
 bool ArbolBEstrella<T>::buscar(T clave) const {
     Nodo<T> *auxiliar = nullptr;
@@ -35,17 +78,143 @@ bool ArbolBEstrella<T>::buscar(T clave) const {
     return buscar(raiz_, clave, auxiliar, i);
 }
 
-// Destructor
-template<typename T>
-ArbolBEstrella<T>::~ArbolBEstrella() {
-    destruir(raiz_);
+// ------------------------------------------------------- //
+/** \brief Inserta una clave y aplica el balanceo necesario. */
+template <typename T>
+bool ArbolBEstrella<T>::insertar(T clave)
+{
+    try
+    {
+        //Si el árbol está vacío, crear un nodo para la raíz
+        if(raiz_ == nullptr) {
+            // La raíz recién creada siempre es una hoja al principio
+            raiz_ = new Nodo<T>(orden_, true);
+            insertarEnOrden(raiz_->claves_, raiz_->num_claves_, clave);
+            raiz_->num_claves_ = 1;
+            return true;
+        }
+
+        //Buscar la clave en el árbol y guardar en una variable la dirección del nodo y del índice donde está o debería estar la clave
+        Nodo<T> *nodo_clave = nullptr;
+        int indice_clave = 0;
+        bool esta_la_clave = buscar(raiz_, clave, nodo_clave, indice_clave);
+
+        //Si la clave ya está en el árbol, devolver falso
+        if(esta_la_clave) {
+            return false;
+        }
+
+        //Si no lo está, insertar la clave en el nodo hoja correspondiente
+        insertarEnOrden(nodo_clave->claves_, nodo_clave->num_claves_, clave);
+        nodo_clave->num_claves_++;
+
+        Nodo<T> *nodo_actual = nodo_clave;
+
+        //Repetir indefinidamente
+        while(true){
+            //Si el nodo se sobrecargó a causa de la inserción de la clave
+            if(nodo_actual->num_claves_ > max_claves_){
+                //Si el nodo es la raíz
+                if(nodo_actual->padre_ == nullptr){
+                    //Dividir la raíz y terminar el ciclo
+                    dividirRaiz(raiz_);
+                    break;
+                }
+                else{
+                    /*Si algún hermano del nodo tiene espacio, redistribuir las claves y terminar el ciclo
+                    Para hacer esto primero debemos obtener el indice que el nodo actual ocupa del arreglo de hijos del padre*/
+
+                    //Obtener el indice del nodo actual
+                    int indice_nodo_actual = obtenerIndice(nodo_actual->padre_->hijos_, nodo_actual->padre_->num_claves_ + 1, nodo_actual);
+
+                    //Si el nodo actual tiene un hermano izquerdo y este tiene espacio, redistribuir
+                    if(indice_nodo_actual > 0){
+                        Nodo<T> *hno_izq_nodo_actual = nodo_actual->padre_->hijos_[indice_nodo_actual - 1];
+
+                        //Si el hermano izquierdo tiene espacio, redistrinuir
+                        if(hno_izq_nodo_actual->num_claves_ < max_claves_){
+                            redistribuir(nodo_actual->padre_, hno_izq_nodo_actual, nodo_actual, indice_nodo_actual - 1);
+                            break;
+                        }
+                    }
+
+                    /*Si llegamos a esta linea, significa que el nodo actual no tiene hermano izquierdo o este estaba lleno, asi que probamos
+                    con el hermano derecho*/
+                    if(indice_nodo_actual < nodo_actual->padre_->num_claves_){
+                        Nodo<T> *hno_der_nodo_actual = nodo_actual->padre_->hijos_[indice_nodo_actual + 1];
+
+                        //Si el hermano derecho tiene espacio, redistribuir
+                        if(hno_der_nodo_actual->num_claves_ < max_claves_){
+                            redistribuir(nodo_actual->padre_, nodo_actual, hno_der_nodo_actual, indice_nodo_actual);
+                            break;
+                        }
+                    }
+
+                    //Si llegamos a este punto, no se pudo hacer ninguna redistribución. Toca dividir dos nodos a tres.
+                    if(indice_nodo_actual > 0){
+                        dividir(nodo_actual->padre_, nodo_actual->padre_->hijos_[indice_nodo_actual - 1], nodo_actual, indice_nodo_actual - 1);
+                    }else{
+                        dividir(nodo_actual->padre_, nodo_actual, nodo_actual->padre_->hijos_[indice_nodo_actual + 1], indice_nodo_actual);
+                    }
+
+                    //Hacer que ahora el nodo sea el padre, para ver si se sobrecargó y continuar la siguiente ejecución del ciclo
+                    nodo_actual = nodo_actual->padre_;
+                    continue;
+                }
+            }
+            // Si no se sobrecargó, entonces terminar el ciclo
+            else{
+                break;
+            }
+        }
+        return true;
+    }
+    catch(std::bad_alloc &error)
+    {
+        throw MemoriaInsuficiente();
+    }
 }
 
-//============================
-// Métodos privados
-//============================
+// ------------------------------------------------------- //
+/** \brief Elimina una clave desde la raíz del árbol. */
+template <typename T>
+bool ArbolBEstrella<T>::eliminar(T clave) {
+    if (raiz_ == nullptr) return false;
 
-//Método Destruir Privado
+    bool resultado = eliminar(raiz_, clave);
+
+    ajustarRaizDespuesDeEliminar();
+
+    return resultado;
+}
+
+// ------------------------------------------------------- //
+/** \brief Destruye todos los nodos y deja el árbol vacío. */
+template <typename T>
+void ArbolBEstrella<T>::vaciar() {
+    // Si el árbol ya está vacío, no hacemos nada.
+    if (raiz_ == nullptr) {
+        return;
+    }
+
+    // Destruye recursivamente todo el árbol desde la raíz.
+    destruir(raiz_);
+
+    // Después de destruir, raiz_ debe quedar en nullptr
+    // para evitar que apunte a memoria ya liberada.
+    raiz_ = nullptr;
+}
+
+// ------------------------------------------------------- //
+/** \brief Imprime el árbol completo en consola. */
+template <typename T>
+void ArbolBEstrella<T>::imprimir() const { imprimir(raiz_, 0); }
+
+// ============================================================================
+//  Manejo de memoria y copia
+// ============================================================================
+
+/** \brief Destruye recursivamente un subárbol. */
 template<typename T>
 void ArbolBEstrella<T>::destruir(Nodo<T>* nodo) {
     if (nodo == nullptr) return;
@@ -55,32 +224,8 @@ void ArbolBEstrella<T>::destruir(Nodo<T>* nodo) {
     delete nodo;
 }
 
-//Buscar privado
-template<typename T>
-bool ArbolBEstrella<T>::buscar(Nodo<T> *subraiz, T clave, Nodo<T>* &auxiliar, int &indice) const{
-    if (subraiz == nullptr) {
-        return false;
-    }
-
-    int i = 0;
-    while (i < subraiz->num_claves_ && clave > subraiz->claves_[i]) {
-        i++;
-    }
-
-    auxiliar = subraiz;
-    indice = i;
-
-    if (i < subraiz->num_claves_ && clave == subraiz->claves_[i]) {
-        return true;
-    }
-
-    if (subraiz->es_hoja_ == true) {
-        return false;
-    }
-
-    return buscar(subraiz->hijos_[i], clave, auxiliar, indice);
-}
-
+// ------------------------------------------------------- //
+/** \brief Copia recursivamente un subárbol y reconstruye padres. */
 template<typename T>
 Nodo<T>* ArbolBEstrella<T>::copiarNodo(Nodo<T> *nodo) {
     if (nodo == nullptr) return nullptr;
@@ -120,7 +265,373 @@ Nodo<T>* ArbolBEstrella<T>::copiarNodo(Nodo<T> *nodo) {
     return nuevo;
 }
 
-//Función privada fusionar
+// ============================================================================
+//  Búsqueda
+// ============================================================================
+
+/** \brief Busca una clave en un subárbol y devuelve el nodo e índice visitados. */
+template<typename T>
+bool ArbolBEstrella<T>::buscar(Nodo<T> *subraiz, T clave, Nodo<T>* &auxiliar, int &indice) const{
+    if (subraiz == nullptr) {
+        return false;
+    }
+
+    int i = 0;
+    while (i < subraiz->num_claves_ && clave > subraiz->claves_[i]) {
+        i++;
+    }
+
+    auxiliar = subraiz;
+    indice = i;
+
+    if (i < subraiz->num_claves_ && clave == subraiz->claves_[i]) {
+        return true;
+    }
+
+    if (subraiz->es_hoja_ == true) {
+        return false;
+    }
+
+    return buscar(subraiz->hijos_[i], clave, auxiliar, indice);
+}
+
+// ============================================================================
+//  Auxiliares generales de arreglos y nodos
+// ============================================================================
+
+/** \brief Inserta una clave en orden dentro de un arreglo. */
+template <typename T>
+int ArbolBEstrella<T>::insertarEnOrden(T arreglo[], int num_elem, const T &elem_insertar)
+{
+    //Hacer que el indice actual sea el indice del ultimo elemento del arreglo
+    int indice_actual = num_elem - 1;
+
+    //Mover una posicion a la derecha todos los elementos mayores que el elemento a insertar
+    while(indice_actual >= 0 && arreglo[indice_actual] > elem_insertar){
+        arreglo[indice_actual + 1] = arreglo[indice_actual];
+        indice_actual = indice_actual - 1;
+    }
+
+    arreglo[indice_actual + 1] = elem_insertar;
+
+    return indice_actual + 1;
+}
+
+// ------------------------------------------------------- //
+/** \brief Inserta un apuntador a nodo en un arreglo de hijos. */
+template <typename T>
+void ArbolBEstrella<T>::insertarEnIndice(Nodo<T> **arreglo_nodos, int num_nodos, Nodo<T> *nodo_insertar, int indice_insercion)
+{
+    //Mover una posicion a la derecha todos los elementos que estan a partir el indice a la derecha
+    for(int i = num_nodos - 1; i >= indice_insercion; i--){
+        arreglo_nodos[i + 1] = arreglo_nodos[i];
+    }
+
+    //Una vez hecho el hueco, insertar el nuevo elemento
+    arreglo_nodos[indice_insercion] = nodo_insertar;
+}
+
+// ------------------------------------------------------- //
+/** \brief Localiza un nodo dentro de un arreglo de hijos. */
+template <typename T>
+int ArbolBEstrella<T>::obtenerIndice(Nodo<T> **arreglo_hijos, int num_hijos, Nodo<T> *nodo_buscado) const
+{
+    //Recorrer los hijos
+    for(int i = 0; i < num_hijos; ++i){
+        //Si la direccion del hijo del arreglo es la misma que la del nodo buscado, devolvemos el indice
+        if(arreglo_hijos[i] == nodo_buscado){
+            return i;
+        }
+    }
+
+    //Si no encuentra al hijo buscado, devolver -1
+    return -1;
+}
+
+// ============================================================================
+//  Inserción y balanceo B*
+// ============================================================================
+
+/** \brief Redistribuye claves e hijos entre dos hermanos. */
+template <typename T>
+void ArbolBEstrella<T>::redistribuir(
+    Nodo<T> *nodo_padre,
+    Nodo<T> *nodo_hijo_izq,
+    Nodo<T> *nodo_hijo_der,
+    int indice_nodo_hijo_izq
+)
+{
+    try
+    {
+        // Guardamos los tamaños originales.
+        int num_claves_nodo_hijo_izq = nodo_hijo_izq->num_claves_;
+        int num_claves_nodo_hijo_der = nodo_hijo_der->num_claves_;
+
+        // Vamos a juntar:
+        // claves del hijo izquierdo
+        // + clave separadora del padre
+        // + claves del hijo derecho.
+        int tam_arreglo_aux = num_claves_nodo_hijo_izq + num_claves_nodo_hijo_der + 1;
+
+        // Arreglo temporal para las claves.
+        T *arreglo_aux = new T[tam_arreglo_aux];
+
+        // Arreglo temporal para hijos internos.
+        // Solo se usa si los nodos no son hojas.
+        Nodo<T> **arreglo_hijos_aux = nullptr;
+        int tam_arreglo_aux_hijos = tam_arreglo_aux + 1;
+
+        if (nodo_hijo_izq->es_hoja_ == false) {
+            arreglo_hijos_aux = new Nodo<T>*[tam_arreglo_aux_hijos];
+        }
+
+        int pos = 0;
+
+        // Copiamos claves del hijo izquierdo.
+        for (int i = 0; i < num_claves_nodo_hijo_izq; ++i) {
+            arreglo_aux[pos++] = nodo_hijo_izq->claves_[i];
+        }
+
+        // Copiamos la clave separadora del padre.
+        arreglo_aux[pos++] = nodo_padre->claves_[indice_nodo_hijo_izq];
+
+        // Copiamos claves del hijo derecho.
+        for (int i = 0; i < num_claves_nodo_hijo_der; ++i) {
+            arreglo_aux[pos++] = nodo_hijo_der->claves_[i];
+        }
+
+        // Si no son hojas, también juntamos todos los hijos.
+        if (nodo_hijo_izq->es_hoja_ == false) {
+            int pos_h = 0;
+
+            // Hijos del nodo izquierdo.
+            for (int i = 0; i <= num_claves_nodo_hijo_izq; ++i) {
+                arreglo_hijos_aux[pos_h++] = nodo_hijo_izq->hijos_[i];
+            }
+
+            // Hijos del nodo derecho.
+            for (int i = 0; i <= num_claves_nodo_hijo_der; ++i) {
+                arreglo_hijos_aux[pos_h++] = nodo_hijo_der->hijos_[i];
+            }
+        }
+
+        // Una clave del arreglo combinado se queda como separadora en el padre.
+        int num_claves_a_repartir = tam_arreglo_aux - 1;
+
+        // El nodo izquierdo recibe la mitad inferior.
+        int num_claves_nuevo_izq = num_claves_a_repartir / 2;
+
+        // Esta posición será la nueva clave separadora del padre.
+        int indice_separadora = num_claves_nuevo_izq;
+
+        // El nodo derecho recibe el resto.
+        int num_claves_nuevo_der = num_claves_a_repartir - num_claves_nuevo_izq;
+
+        // Reescribimos claves del nodo izquierdo.
+        for (int i = 0; i < num_claves_nuevo_izq; ++i) {
+            nodo_hijo_izq->claves_[i] = arreglo_aux[i];
+        }
+
+        // Actualizamos cantidad de claves del izquierdo.
+        nodo_hijo_izq->num_claves_ = num_claves_nuevo_izq;
+
+        // Actualizamos la clave separadora del padre.
+        nodo_padre->claves_[indice_nodo_hijo_izq] = arreglo_aux[indice_separadora];
+
+        // Reescribimos claves del nodo derecho.
+        for (int i = 0; i < num_claves_nuevo_der; ++i) {
+            nodo_hijo_der->claves_[i] = arreglo_aux[indice_separadora + 1 + i];
+        }
+
+        // Actualizamos cantidad de claves del derecho.
+        nodo_hijo_der->num_claves_ = num_claves_nuevo_der;
+
+        // Si los nodos son internos, redistribuimos también sus hijos.
+        if (nodo_hijo_izq->es_hoja_ == false) {
+            // El izquierdo necesita num_claves_nuevo_izq + 1 hijos.
+            for (int i = 0; i <= num_claves_nuevo_izq; ++i) {
+                nodo_hijo_izq->hijos_[i] = arreglo_hijos_aux[i];
+
+                // Actualizamos el padre de cada hijo.
+                if (nodo_hijo_izq->hijos_[i] != nullptr) {
+                    nodo_hijo_izq->hijos_[i]->padre_ = nodo_hijo_izq;
+                }
+            }
+
+            // El derecho necesita num_claves_nuevo_der + 1 hijos.
+            for (int i = 0; i <= num_claves_nuevo_der; ++i) {
+                nodo_hijo_der->hijos_[i] = arreglo_hijos_aux[indice_separadora + 1 + i];
+
+                // Actualizamos el padre de cada hijo.
+                if (nodo_hijo_der->hijos_[i] != nullptr) {
+                    nodo_hijo_der->hijos_[i]->padre_ = nodo_hijo_der;
+                }
+            }
+
+            // Limpiamos punteros sobrantes del izquierdo.
+            for (int i = num_claves_nuevo_izq + 1; i <= orden_; ++i) {
+                nodo_hijo_izq->hijos_[i] = nullptr;
+            }
+
+            // Limpiamos punteros sobrantes del derecho.
+            for (int i = num_claves_nuevo_der + 1; i <= orden_; ++i) {
+                nodo_hijo_der->hijos_[i] = nullptr;
+            }
+        }
+
+        // Liberamos memoria temporal.
+        delete[] arreglo_aux;
+        delete[] arreglo_hijos_aux;
+    }
+    catch (std::bad_alloc &error)
+    {
+        throw MemoriaInsuficiente();
+    }
+}
+
+// ------------------------------------------------------- //
+/** \brief Divide dos hermanos en tres nodos durante inserción B*. */
+template <typename T>
+void ArbolBEstrella<T>::dividir(Nodo<T> *nodo_padre, Nodo<T> *nodo_hijo_izq, Nodo<T> *nodo_hijo_der, int indice_nodo_hijo_izq)
+{
+    try
+    {
+        //Crear un nuevo nodo
+        Nodo<T> *nuevo_nodo = new Nodo<T>(orden_, nodo_hijo_izq->es_hoja_);
+
+        //Crear arreglo auxiliar para claves
+        int num_claves_nodo_hijo_izq = nodo_hijo_izq->num_claves_;
+        int num_claves_nodo_hijo_der = nodo_hijo_der->num_claves_;
+        int tam_arreglo_aux = num_claves_nodo_hijo_izq + num_claves_nodo_hijo_der + 1;
+        T *arreglo_aux = new T[tam_arreglo_aux];
+
+        //Crear un arreglo auxiliar para los hijos
+        int num_hijos_nodo_hijo_izq = num_claves_nodo_hijo_izq + 1;
+        int num_hijos_nodo_hijo_der = num_claves_nodo_hijo_der + 1;
+        int tam_arreglo_aux_hijos = num_hijos_nodo_hijo_izq + num_hijos_nodo_hijo_der;
+        Nodo<T> **arreglo_hijos_aux = nullptr;
+
+        if(nodo_hijo_izq->es_hoja_ == false){
+            arreglo_hijos_aux = new Nodo<T>*[tam_arreglo_aux_hijos];
+        }
+
+
+        //Poner claves del hijo izquierdo
+        for(int i = 0; i < num_claves_nodo_hijo_izq; ++i){
+            arreglo_aux[i] = nodo_hijo_izq->claves_[i];
+        }
+
+        //Poner clave del padre
+        arreglo_aux[num_claves_nodo_hijo_izq] = nodo_padre->claves_[indice_nodo_hijo_izq];
+
+        //Poner claves del hijo derecho
+        int ultimo_indice_arreglo_aux = num_claves_nodo_hijo_izq;
+        for(int i = 0; i < num_claves_nodo_hijo_der; ++i){
+            arreglo_aux[ultimo_indice_arreglo_aux + 1 + i] = nodo_hijo_der->claves_[i];
+        }
+
+        //En este punto, hemos agregado al arreglo auxiliar, todas las claves de los nodos hijos y la del padre
+
+        //Si los nodos tienen hijos, entonces agregar al arreglo auxiliar de hijos los hijos de los nodos hijos
+        if(nodo_hijo_izq->es_hoja_ == false){
+
+            // Agregar los hijos del nodo izquierdo
+            for(int i = 0; i < num_hijos_nodo_hijo_izq; ++i){
+                arreglo_hijos_aux[i] = nodo_hijo_izq->hijos_[i];
+            }
+
+            // Agregar los hijos del nodo derecho
+            for(int i = 0; i < num_hijos_nodo_hijo_der; ++i){
+                arreglo_hijos_aux[num_hijos_nodo_hijo_izq + i] = nodo_hijo_der->hijos_[i];
+            }
+        }
+
+        //Calcular cuantas claves tendrá cada uno de los tres nodos hijos
+        int num_claves_a_repartir = tam_arreglo_aux - 2;
+        int num_claves_nodo_1 = num_claves_a_repartir / 3;
+        int num_claves_nodo_2 = (num_claves_a_repartir - num_claves_nodo_1) / 2;
+        int num_claves_nodo_3 = num_claves_a_repartir - num_claves_nodo_1 - num_claves_nodo_2;
+
+        //Calcular los índices de las claves que estarán en el padre funcionando como separadoras
+        int indice_1 = num_claves_nodo_1;
+        int indice_2 = num_claves_nodo_1 + num_claves_nodo_2 + 1;
+
+        //REPARTIR LAS CLAVES A LOS 3 NODOS HIJOS
+
+        //Mudar las claves que van en el nodo 1
+        for(int i = 0; i < num_claves_nodo_1; ++i){
+            nodo_hijo_izq->claves_[i] = arreglo_aux[i];
+        }
+
+        //Si los nodos tienen hijos, mudar los hijos que van en el nodo 1
+        if(nodo_hijo_izq->es_hoja_ == false){
+            for(int i = 0; i < (num_claves_nodo_1 + 1); ++i){
+                nodo_hijo_izq->hijos_[i] = arreglo_hijos_aux[i];
+                nodo_hijo_izq->hijos_[i]->padre_ = nodo_hijo_izq;
+            }
+        }
+
+        //Mudar claves que van en el nodo 2
+        for(int i = 0; i < num_claves_nodo_2; ++i){
+            nuevo_nodo->claves_[i] = arreglo_aux[indice_1 + 1 + i];
+        }
+
+        //Si los nodos tienen hijos, mudar los hijos que van en el nodo 2
+        if(nodo_hijo_izq->es_hoja_ == false){
+            for(int i = 0; i < (num_claves_nodo_2 + 1); ++i){
+                nuevo_nodo->hijos_[i] = arreglo_hijos_aux[num_claves_nodo_1 + 1 + i];
+                nuevo_nodo->hijos_[i]->padre_ = nuevo_nodo;
+            }
+        }
+
+        //Mudar las claves que van en el nodo 3
+        for(int i = 0; i < num_claves_nodo_3; ++i){
+            nodo_hijo_der->claves_[i] = arreglo_aux[indice_2 + 1 + i];
+        }
+
+        //Si los nodos tiene hijos, mudar los hijos que van en el nodo 3
+        if(nodo_hijo_izq->es_hoja_ == false){
+            for(int i = 0; i < (num_claves_nodo_3 + 1); ++i){
+                nodo_hijo_der->hijos_[i] = arreglo_hijos_aux[num_claves_nodo_1 + num_claves_nodo_2 + 2 + i];
+                nodo_hijo_der->hijos_[i]->padre_ = nodo_hijo_der;
+            }
+        }
+
+        //Actualizar contadores de claves
+        nodo_hijo_izq->num_claves_ = num_claves_nodo_1;
+        nuevo_nodo->num_claves_ = num_claves_nodo_2;
+        nodo_hijo_der->num_claves_ = num_claves_nodo_3;
+
+        //Para este punto ya tenemos los tres nodos hijos con sus respectivas claves y sus respectivos hijos
+
+        //ACTUALIZACION DEL PADRE
+
+        //Reemplazar en el padre la primera clave
+        nodo_padre->claves_[indice_nodo_hijo_izq] = arreglo_aux[indice_1];
+
+        //Insertar la segunda clave
+         int indice_clave_2 = insertarEnOrden(nodo_padre->claves_, nodo_padre->num_claves_, arreglo_aux[indice_2]);
+
+         //Actualizar el numero de claves del padre
+        nodo_padre->num_claves_ = nodo_padre->num_claves_ + 1;
+
+        //Insertar el nuevo nodo en el arreglo de hijos del padre
+        insertarEnIndice(nodo_padre->hijos_, nodo_padre->num_claves_, nuevo_nodo, indice_clave_2);
+        nuevo_nodo->padre_ = nodo_padre;
+
+        delete[] arreglo_aux;
+        if(arreglo_hijos_aux != nullptr){
+            delete[] arreglo_hijos_aux;
+        }
+    }
+    catch(std::bad_alloc &error)
+    {
+        throw MemoriaInsuficiente();
+    }
+}
+
+// ------------------------------------------------------- //
+/** \brief Fusiona tres hijos en dos nodos conservando una separadora en el padre. */
 template <typename T>
 void ArbolBEstrella<T>::fusionar(Nodo<T> *padre, int indice) {
     // Validación básica: no podemos fusionar si no hay padre.
@@ -327,68 +838,8 @@ void ArbolBEstrella<T>::fusionar(Nodo<T> *padre, int indice) {
     delete[] hijos_aux;
 }
 
-//METODOS DE CLASES AUXILIARES
-template <typename T>
-ArbolBEstrella<T>::MemoriaInsuficiente::MemoriaInsuficiente() throw(){}
-//**
-
-//Método que informa cual fue el prolema
-template <typename T>
-const char* ArbolBEstrella<T>::MemoriaInsuficiente::what() const throw()
-{
-    return "Memoria insuficiente";
-}
-
-template <typename T>
-int ArbolBEstrella<T>::insertarEnOrden(T arreglo[], int num_elem, const T &elem_insertar)
-{
-    //Hacer que el indice actual sea el indice del ultimo elemento del arreglo
-    int indice_actual = num_elem - 1;
-
-    //Mover una posicion a la derecha todos los elementos mayores que el elemento a insertar
-    while(indice_actual >= 0 && arreglo[indice_actual] > elem_insertar){
-        arreglo[indice_actual + 1] = arreglo[indice_actual];
-        indice_actual = indice_actual - 1;
-    }
-
-    arreglo[indice_actual + 1] = elem_insertar;
-
-    return indice_actual + 1;
-}
-
-//**
-
-template <typename T>
-void ArbolBEstrella<T>::insertarEnIndice(Nodo<T> **arreglo_nodos, int num_nodos, Nodo<T> *nodo_insertar, int indice_insercion)
-{
-    //Mover una posicion a la derecha todos los elementos que estan a partir el indice a la derecha
-    for(int i = num_nodos - 1; i >= indice_insercion; i--){
-        arreglo_nodos[i + 1] = arreglo_nodos[i];
-    }
-
-    //Una vez hecho el hueco, insertar el nuevo elemento
-    arreglo_nodos[indice_insercion] = nodo_insertar;
-}
-
-//**
-
-template <typename T>
-int ArbolBEstrella<T>::obtenerIndice(Nodo<T> **arreglo_hijos, int num_hijos, Nodo<T> *nodo_buscado) const
-{
-    //Recorrer los hijos
-    for(int i = 0; i < num_hijos; ++i){
-        //Si la direccion del hijo del arreglo es la misma que la del nodo buscado, devolvemos el indice
-        if(arreglo_hijos[i] == nodo_buscado){
-            return i;
-        }
-    }
-
-    //Si no encuentra al hijo buscado, devolver -1
-    return -1;
-}
-
-//***************************************************************
-
+// ------------------------------------------------------- //
+/** \brief Divide la raíz cuando ocurre overflow en ella. */
 template <typename T>
 void ArbolBEstrella<T>::dividirRaiz(Nodo<T> *vieja_raiz)
 {
@@ -439,531 +890,11 @@ void ArbolBEstrella<T>::dividirRaiz(Nodo<T> *vieja_raiz)
     }
 }
 
-//***************************************************************
-
-template <typename T>
-void ArbolBEstrella<T>::dividir(Nodo<T> *nodo_padre, Nodo<T> *nodo_hijo_izq, Nodo<T> *nodo_hijo_der, int indice_nodo_hijo_izq)
-{
-    try
-    {
-        //Crear un nuevo nodo
-        Nodo<T> *nuevo_nodo = new Nodo<T>(orden_, nodo_hijo_izq->es_hoja_);
-
-        //Crear arreglo auxiliar para claves
-        int num_claves_nodo_hijo_izq = nodo_hijo_izq->num_claves_;
-        int num_claves_nodo_hijo_der = nodo_hijo_der->num_claves_;
-        int tam_arreglo_aux = num_claves_nodo_hijo_izq + num_claves_nodo_hijo_der + 1;
-        T *arreglo_aux = new T[tam_arreglo_aux];
-
-        //Crear un arreglo auxiliar para los hijos
-        int num_hijos_nodo_hijo_izq = num_claves_nodo_hijo_izq + 1;
-        int num_hijos_nodo_hijo_der = num_claves_nodo_hijo_der + 1;
-        int tam_arreglo_aux_hijos = num_hijos_nodo_hijo_izq + num_hijos_nodo_hijo_der;
-        Nodo<T> **arreglo_hijos_aux = nullptr;
-
-        if(nodo_hijo_izq->es_hoja_ == false){
-            arreglo_hijos_aux = new Nodo<T>*[tam_arreglo_aux_hijos];
-        }
-
-
-        //Poner claves del hijo izquierdo
-        for(int i = 0; i < num_claves_nodo_hijo_izq; ++i){
-            arreglo_aux[i] = nodo_hijo_izq->claves_[i];
-        }
-
-        //Poner clave del padre
-        arreglo_aux[num_claves_nodo_hijo_izq] = nodo_padre->claves_[indice_nodo_hijo_izq];
-
-        //Poner claves del hijo derecho
-        int ultimo_indice_arreglo_aux = num_claves_nodo_hijo_izq;
-        for(int i = 0; i < num_claves_nodo_hijo_der; ++i){
-            arreglo_aux[ultimo_indice_arreglo_aux + 1 + i] = nodo_hijo_der->claves_[i];
-        }
-
-        //En este punto, hemos agregado al arreglo auxiliar, todas las claves de los nodos hijos y la del padre
-
-        //Si los nodos tienen hijos, entonces agregar al arreglo auxiliar de hijos los hijos de los nodos hijos
-        if(nodo_hijo_izq->es_hoja_ == false){
-
-            // Agregar los hijos del nodo izquierdo
-            for(int i = 0; i < num_hijos_nodo_hijo_izq; ++i){
-                arreglo_hijos_aux[i] = nodo_hijo_izq->hijos_[i];
-            }
-
-            // Agregar los hijos del nodo derecho
-            for(int i = 0; i < num_hijos_nodo_hijo_der; ++i){
-                arreglo_hijos_aux[num_hijos_nodo_hijo_izq + i] = nodo_hijo_der->hijos_[i];
-            }
-        }
-
-        //Calcular cuantas claves tendrá cada uno de los tres nodos hijos
-        int num_claves_a_repartir = tam_arreglo_aux - 2;
-        int num_claves_nodo_1 = num_claves_a_repartir / 3;
-        int num_claves_nodo_2 = (num_claves_a_repartir - num_claves_nodo_1) / 2;
-        int num_claves_nodo_3 = num_claves_a_repartir - num_claves_nodo_1 - num_claves_nodo_2;
-
-        //Calcular los índices de las claves que estarán en el padre funcionando como separadoras
-        int indice_1 = num_claves_nodo_1;
-        int indice_2 = num_claves_nodo_1 + num_claves_nodo_2 + 1;
-
-        //REPARTIR LAS CLAVES A LOS 3 NODOS HIJOS
-
-        //Mudar las claves que van en el nodo 1
-        for(int i = 0; i < num_claves_nodo_1; ++i){
-            nodo_hijo_izq->claves_[i] = arreglo_aux[i];
-        }
-
-        //Si los nodos tienen hijos, mudar los hijos que van en el nodo 1
-        if(nodo_hijo_izq->es_hoja_ == false){
-            for(int i = 0; i < (num_claves_nodo_1 + 1); ++i){
-                nodo_hijo_izq->hijos_[i] = arreglo_hijos_aux[i];
-                nodo_hijo_izq->hijos_[i]->padre_ = nodo_hijo_izq;
-            }
-        }
-
-        //Mudar claves que van en el nodo 2
-        for(int i = 0; i < num_claves_nodo_2; ++i){
-            nuevo_nodo->claves_[i] = arreglo_aux[indice_1 + 1 + i];
-        }
-
-        //Si los nodos tienen hijos, mudar los hijos que van en el nodo 2
-        if(nodo_hijo_izq->es_hoja_ == false){
-            for(int i = 0; i < (num_claves_nodo_2 + 1); ++i){
-                nuevo_nodo->hijos_[i] = arreglo_hijos_aux[num_claves_nodo_1 + 1 + i];
-                nuevo_nodo->hijos_[i]->padre_ = nuevo_nodo;
-            }
-        }
-
-        //Mudar las claves que van en el nodo 3
-        for(int i = 0; i < num_claves_nodo_3; ++i){
-            nodo_hijo_der->claves_[i] = arreglo_aux[indice_2 + 1 + i];
-        }
-
-        //Si los nodos tiene hijos, mudar los hijos que van en el nodo 3
-        if(nodo_hijo_izq->es_hoja_ == false){
-            for(int i = 0; i < (num_claves_nodo_3 + 1); ++i){
-                nodo_hijo_der->hijos_[i] = arreglo_hijos_aux[num_claves_nodo_1 + num_claves_nodo_2 + 2 + i];
-                nodo_hijo_der->hijos_[i]->padre_ = nodo_hijo_der;
-            }
-        }
-
-        //Actualizar contadores de claves
-        nodo_hijo_izq->num_claves_ = num_claves_nodo_1;
-        nuevo_nodo->num_claves_ = num_claves_nodo_2;
-        nodo_hijo_der->num_claves_ = num_claves_nodo_3;
-
-        //Para este punto ya tenemos los tres nodos hijos con sus respectivas claves y sus respectivos hijos
-
-        //ACTUALIZACION DEL PADRE
-
-        //Reemplazar en el padre la primera clave
-        nodo_padre->claves_[indice_nodo_hijo_izq] = arreglo_aux[indice_1];
-
-        //Insertar la segunda clave
-         int indice_clave_2 = insertarEnOrden(nodo_padre->claves_, nodo_padre->num_claves_, arreglo_aux[indice_2]);
-
-         //Actualizar el numero de claves del padre
-        nodo_padre->num_claves_ = nodo_padre->num_claves_ + 1;
-
-        //Insertar el nuevo nodo en el arreglo de hijos del padre
-        insertarEnIndice(nodo_padre->hijos_, nodo_padre->num_claves_, nuevo_nodo, indice_clave_2);
-        nuevo_nodo->padre_ = nodo_padre;
-
-        delete[] arreglo_aux;
-        if(arreglo_hijos_aux != nullptr){
-            delete[] arreglo_hijos_aux;
-        }
-    }
-    catch(std::bad_alloc &error)
-    {
-        throw MemoriaInsuficiente();
-    }
-}
-
-//***********************************************************************
-
-template <typename T>
-void ArbolBEstrella<T>::redistribuir(
-    Nodo<T> *nodo_padre,
-    Nodo<T> *nodo_hijo_izq,
-    Nodo<T> *nodo_hijo_der,
-    int indice_nodo_hijo_izq
-)
-{
-    try
-    {
-        // Guardamos los tamaños originales.
-        int num_claves_nodo_hijo_izq = nodo_hijo_izq->num_claves_;
-        int num_claves_nodo_hijo_der = nodo_hijo_der->num_claves_;
-
-        // Vamos a juntar:
-        // claves del hijo izquierdo
-        // + clave separadora del padre
-        // + claves del hijo derecho.
-        int tam_arreglo_aux = num_claves_nodo_hijo_izq + num_claves_nodo_hijo_der + 1;
-
-        // Arreglo temporal para las claves.
-        T *arreglo_aux = new T[tam_arreglo_aux];
-
-        // Arreglo temporal para hijos internos.
-        // Solo se usa si los nodos no son hojas.
-        Nodo<T> **arreglo_hijos_aux = nullptr;
-        int tam_arreglo_aux_hijos = tam_arreglo_aux + 1;
-
-        if (nodo_hijo_izq->es_hoja_ == false) {
-            arreglo_hijos_aux = new Nodo<T>*[tam_arreglo_aux_hijos];
-        }
-
-        int pos = 0;
-
-        // Copiamos claves del hijo izquierdo.
-        for (int i = 0; i < num_claves_nodo_hijo_izq; ++i) {
-            arreglo_aux[pos++] = nodo_hijo_izq->claves_[i];
-        }
-
-        // Copiamos la clave separadora del padre.
-        arreglo_aux[pos++] = nodo_padre->claves_[indice_nodo_hijo_izq];
-
-        // Copiamos claves del hijo derecho.
-        for (int i = 0; i < num_claves_nodo_hijo_der; ++i) {
-            arreglo_aux[pos++] = nodo_hijo_der->claves_[i];
-        }
-
-        // Si no son hojas, también juntamos todos los hijos.
-        if (nodo_hijo_izq->es_hoja_ == false) {
-            int pos_h = 0;
-
-            // Hijos del nodo izquierdo.
-            for (int i = 0; i <= num_claves_nodo_hijo_izq; ++i) {
-                arreglo_hijos_aux[pos_h++] = nodo_hijo_izq->hijos_[i];
-            }
-
-            // Hijos del nodo derecho.
-            for (int i = 0; i <= num_claves_nodo_hijo_der; ++i) {
-                arreglo_hijos_aux[pos_h++] = nodo_hijo_der->hijos_[i];
-            }
-        }
-
-        // Una clave del arreglo combinado se queda como separadora en el padre.
-        int num_claves_a_repartir = tam_arreglo_aux - 1;
-
-        // El nodo izquierdo recibe la mitad inferior.
-        int num_claves_nuevo_izq = num_claves_a_repartir / 2;
-
-        // Esta posición será la nueva clave separadora del padre.
-        int indice_separadora = num_claves_nuevo_izq;
-
-        // El nodo derecho recibe el resto.
-        int num_claves_nuevo_der = num_claves_a_repartir - num_claves_nuevo_izq;
-
-        // Reescribimos claves del nodo izquierdo.
-        for (int i = 0; i < num_claves_nuevo_izq; ++i) {
-            nodo_hijo_izq->claves_[i] = arreglo_aux[i];
-        }
-
-        // Actualizamos cantidad de claves del izquierdo.
-        nodo_hijo_izq->num_claves_ = num_claves_nuevo_izq;
-
-        // Actualizamos la clave separadora del padre.
-        nodo_padre->claves_[indice_nodo_hijo_izq] = arreglo_aux[indice_separadora];
-
-        // Reescribimos claves del nodo derecho.
-        for (int i = 0; i < num_claves_nuevo_der; ++i) {
-            nodo_hijo_der->claves_[i] = arreglo_aux[indice_separadora + 1 + i];
-        }
-
-        // Actualizamos cantidad de claves del derecho.
-        nodo_hijo_der->num_claves_ = num_claves_nuevo_der;
-
-        // Si los nodos son internos, redistribuimos también sus hijos.
-        if (nodo_hijo_izq->es_hoja_ == false) {
-            // El izquierdo necesita num_claves_nuevo_izq + 1 hijos.
-            for (int i = 0; i <= num_claves_nuevo_izq; ++i) {
-                nodo_hijo_izq->hijos_[i] = arreglo_hijos_aux[i];
-
-                // Actualizamos el padre de cada hijo.
-                if (nodo_hijo_izq->hijos_[i] != nullptr) {
-                    nodo_hijo_izq->hijos_[i]->padre_ = nodo_hijo_izq;
-                }
-            }
-
-            // El derecho necesita num_claves_nuevo_der + 1 hijos.
-            for (int i = 0; i <= num_claves_nuevo_der; ++i) {
-                nodo_hijo_der->hijos_[i] = arreglo_hijos_aux[indice_separadora + 1 + i];
-
-                // Actualizamos el padre de cada hijo.
-                if (nodo_hijo_der->hijos_[i] != nullptr) {
-                    nodo_hijo_der->hijos_[i]->padre_ = nodo_hijo_der;
-                }
-            }
-
-            // Limpiamos punteros sobrantes del izquierdo.
-            for (int i = num_claves_nuevo_izq + 1; i <= orden_; ++i) {
-                nodo_hijo_izq->hijos_[i] = nullptr;
-            }
-
-            // Limpiamos punteros sobrantes del derecho.
-            for (int i = num_claves_nuevo_der + 1; i <= orden_; ++i) {
-                nodo_hijo_der->hijos_[i] = nullptr;
-            }
-        }
-
-        // Liberamos memoria temporal.
-        delete[] arreglo_aux;
-        delete[] arreglo_hijos_aux;
-    }
-    catch (std::bad_alloc &error)
-    {
-        throw MemoriaInsuficiente();
-    }
-}
-
-//***********************************************************************
-
-template <typename T>
-bool ArbolBEstrella<T>::insertar(T clave)
-{
-    try
-    {
-        //Si el árbol está vacío, crear un nodo para la raíz
-        if(raiz_ == nullptr) {
-            // La raíz recién creada siempre es una hoja al principio
-            raiz_ = new Nodo<T>(orden_, true);
-            insertarEnOrden(raiz_->claves_, raiz_->num_claves_, clave);
-            raiz_->num_claves_ = 1;
-            return true;
-        }
-
-        //Buscar la clave en el árbol y guardar en una variable la dirección del nodo y del índice donde está o debería estar la clave
-        Nodo<T> *nodo_clave = nullptr;
-        int indice_clave = 0;
-        bool esta_la_clave = buscar(raiz_, clave, nodo_clave, indice_clave);
-
-        //Si la clave ya está en el árbol, devolver falso
-        if(esta_la_clave) {
-            return false;
-        }
-
-        //Si no lo está, insertar la clave en el nodo hoja correspondiente
-        insertarEnOrden(nodo_clave->claves_, nodo_clave->num_claves_, clave);
-        nodo_clave->num_claves_++;
-
-        Nodo<T> *nodo_actual = nodo_clave;
-
-        //Repetir indefinidamente
-        while(true){
-            //Si el nodo se sobrecargó a causa de la inserción de la clave
-            if(nodo_actual->num_claves_ > max_claves_){
-                //Si el nodo es la raíz
-                if(nodo_actual->padre_ == nullptr){
-                    //Dividir la raíz y terminar el ciclo
-                    dividirRaiz(raiz_);
-                    break;
-                }
-                else{
-                    /*Si algún hermano del nodo tiene espacio, redistribuir las claves y terminar el ciclo
-                    Para hacer esto primero debemos obtener el indice que el nodo actual ocupa del arreglo de hijos del padre*/
-
-                    //Obtener el indice del nodo actual
-                    int indice_nodo_actual = obtenerIndice(nodo_actual->padre_->hijos_, nodo_actual->padre_->num_claves_ + 1, nodo_actual);
-
-                    //Si el nodo actual tiene un hermano izquerdo y este tiene espacio, redistribuir
-                    if(indice_nodo_actual > 0){
-                        Nodo<T> *hno_izq_nodo_actual = nodo_actual->padre_->hijos_[indice_nodo_actual - 1];
-
-                        //Si el hermano izquierdo tiene espacio, redistrinuir
-                        if(hno_izq_nodo_actual->num_claves_ < max_claves_){
-                            redistribuir(nodo_actual->padre_, hno_izq_nodo_actual, nodo_actual, indice_nodo_actual - 1);
-                            break;
-                        }
-                    }
-
-                    /*Si llegamos a esta linea, significa que el nodo actual no tiene hermano izquierdo o este estaba lleno, asi que probamos
-                    con el hermano derecho*/
-                    if(indice_nodo_actual < nodo_actual->padre_->num_claves_){
-                        Nodo<T> *hno_der_nodo_actual = nodo_actual->padre_->hijos_[indice_nodo_actual + 1];
-
-                        //Si el hermano derecho tiene espacio, redistribuir
-                        if(hno_der_nodo_actual->num_claves_ < max_claves_){
-                            redistribuir(nodo_actual->padre_, nodo_actual, hno_der_nodo_actual, indice_nodo_actual);
-                            break;
-                        }
-                    }
-
-                    //Si llegamos a este punto, no se pudo hacer ninguna redistribución. Toca dividir dos nodos a tres.
-                    if(indice_nodo_actual > 0){
-                        dividir(nodo_actual->padre_, nodo_actual->padre_->hijos_[indice_nodo_actual - 1], nodo_actual, indice_nodo_actual - 1);
-                    }else{
-                        dividir(nodo_actual->padre_, nodo_actual, nodo_actual->padre_->hijos_[indice_nodo_actual + 1], indice_nodo_actual);
-                    }
-
-                    //Hacer que ahora el nodo sea el padre, para ver si se sobrecargó y continuar la siguiente ejecución del ciclo
-                    nodo_actual = nodo_actual->padre_;
-                    continue;
-                }
-            }
-            // Si no se sobrecargó, entonces terminar el ciclo
-            else{
-                break;
-            }
-        }
-        return true;
-    }
-    catch(std::bad_alloc &error)
-    {
-        throw MemoriaInsuficiente();
-    }
-}
-
-template <typename T>
-void ArbolBEstrella<T>::imprimir() const { imprimir(raiz_, 0); }
-
-template <typename T>
-void ArbolBEstrella<T>::imprimir(Nodo<T> *nodo, int nivel) const {
-    if (nodo == nullptr) return;
-
-    for (int i = nodo->num_claves_ - 1; i >= 0; --i) {
-        imprimir(nodo->hijos_[i + 1], nivel + 1);
-        for (int j = 0; j < nivel; ++j) std::cout << "    ";
-        std::cout << nodo->claves_[i] << std::endl;
-    }
-
-    imprimir(nodo->hijos_[0], nivel + 1);
-}
-
-template <typename T>
-bool ArbolBEstrella<T>::eliminar(T clave) {
-    if (raiz_ == nullptr) return false;
-
-    bool resultado = eliminar(raiz_, clave);
-
-    ajustarRaizDespuesDeEliminar();
-
-    return resultado;
-}
-
-template <typename T>
-bool ArbolBEstrella<T>::esDeficiente(Nodo<T> *nodo) const {
-    if (nodo == raiz_) return false;
-    return nodo->num_claves_ < minimoClaves();
-}
-
-template <typename T>
-T ArbolBEstrella<T>::obtenerSucesor(Nodo<T> *nodo, int indice) const {
-    Nodo<T> *actual = nodo->hijos_[indice + 1];
-    while (!actual->es_hoja_) actual = actual->hijos_[0];
-
-    return actual->claves_[0];
-}
-
-template <typename T>
-T ArbolBEstrella<T>::obtenerPredecesor(Nodo<T> *nodo, int indice) const {
-    Nodo<T> *actual = nodo->hijos_[indice];
-    while (!actual->es_hoja_) actual = actual->hijos_[actual->num_claves_];
-
-    return actual->claves_[actual->num_claves_ - 1];
-}
-
-template <typename T>
-void ArbolBEstrella<T>::corregirDeficiencia(Nodo<T> *nodo_padre, int indice_hijo) {
-    // Si no hay padre, no podemos corregir desde aquí.
-    if (nodo_padre == nullptr) {
-        return;
-    }
-
-    // indice_hijo debe ser un índice válido dentro de los hijos del padre.
-    // Un nodo con k claves tiene k + 1 hijos, por eso puede llegar hasta num_claves_.
-    if (indice_hijo < 0 || indice_hijo > nodo_padre->num_claves_) {
-        return;
-    }
-
-    // Nodo que quedó con menos claves de las permitidas.
-    Nodo<T> *hijo_deficiente = nodo_padre->hijos_[indice_hijo];
-
-    // Si no existe o realmente no está deficiente, no hacemos nada.
-    if (hijo_deficiente == nullptr || !esDeficiente(hijo_deficiente)) {
-        return;
-    }
-
-    // Mínimo de claves que debe conservar un nodo no raíz.
-    int minimo = minimoClaves();
-
-    // ============================================================
-    // 1. Intentar pedir prestado al hermano izquierdo.
-    // ============================================================
-    if (indice_hijo > 0) {
-        Nodo<T> *hermano_izq = nodo_padre->hijos_[indice_hijo - 1];
-
-        // Solo podemos pedir prestado si el hermano tiene más del mínimo.
-        // Si tiene exactamente el mínimo, no le podemos quitar una clave.
-        if (hermano_izq != nullptr && hermano_izq->num_claves_ > minimo) {
-            // Redistribuimos entre hermano izquierdo y nodo deficiente.
-            redistribuir(nodo_padre, hermano_izq, hijo_deficiente, indice_hijo - 1);
-            return;
-        }
-    }
-
-    // ============================================================
-    // 2. Intentar pedir prestado al hermano derecho.
-    // ============================================================
-    if (indice_hijo < nodo_padre->num_claves_) {
-        Nodo<T> *hermano_der = nodo_padre->hijos_[indice_hijo + 1];
-
-        // Igual que antes: solo puede prestar si tiene más del mínimo.
-        if (hermano_der != nullptr && hermano_der->num_claves_ > minimo) {
-            // Redistribuimos entre nodo deficiente y hermano derecho.
-            redistribuir(nodo_padre, hijo_deficiente, hermano_der, indice_hijo);
-            return;
-        }
-    }
-
-    // ============================================================
-    // 3. Si no se pudo prestar, intentamos fusión B*: 3 hijos -> 2 hijos.
-    // ============================================================
-    if (nodo_padre->num_claves_ >= 2) {
-        int indice_fusion = 0;
-
-        // Si el hijo deficiente es el primero,
-        // usamos la ventana de hijos 0, 1 y 2.
-        if (indice_hijo == 0) {
-            indice_fusion = 0;
-        }
-
-        // Si el hijo deficiente es el último,
-        // usamos la última ventana posible de tres hijos.
-        else if (indice_hijo == nodo_padre->num_claves_) {
-            indice_fusion = nodo_padre->num_claves_ - 2;
-        }
-
-        // Si está en medio,
-        // usamos hijo izquierdo, hijo deficiente y hijo derecho.
-        else {
-            indice_fusion = indice_hijo - 1;
-        }
-
-        // Aquí por fin usamos la función fusionar.
-        // Esta es la operación B* importante.
-        fusionar(nodo_padre, indice_fusion);
-        return;
-    }
-
-    // ============================================================
-    // 4. Caso especial: el padre solo tiene una clave.
-    // ============================================================
-    // Si el padre tiene una sola clave, solo tiene dos hijos.
-    // Entonces no hay tres hijos disponibles para hacer B* 3->2.
-    // En ese caso usamos fusión clásica 2->1.
-
-    if (indice_hijo > 0) {
-        // Fusionamos hermano izquierdo + hijo deficiente.
-        fusionarDosHijos(nodo_padre, indice_hijo - 1);
-    }
-    else {
-        // Fusionamos hijo deficiente + hermano derecho.
-        fusionarDosHijos(nodo_padre, indice_hijo);
-    }
-}
-
+// ============================================================================
+//  Eliminación y corrección de deficiencias
+// ============================================================================
+
+/** \brief Elimina una clave dentro de un subárbol. */
 template<typename T>
 bool ArbolBEstrella<T>::eliminar(Nodo<T> *subraiz, T clave) {
     // Si llegamos a un nodo nulo, la clave no existe.
@@ -1083,43 +1014,151 @@ bool ArbolBEstrella<T>::eliminar(Nodo<T> *subraiz, T clave) {
     return resultado;
 }
 
+// ------------------------------------------------------- //
+/** \brief Calcula el mínimo de claves requerido para nodos no raíz. */
 template <typename T>
-void ArbolBEstrella<T>::ajustarRaizDespuesDeEliminar() {
-    // Si no hay raíz, no hay nada que ajustar.
-    if (raiz_ == nullptr) {
-        return;
+int ArbolBEstrella<T>::minimoClaves() const {
+    int minimo = (2 * orden_ - 1) / 3;
+
+    if (minimo < 1) {
+        minimo = 1;
     }
 
-    // Si la raíz todavía tiene claves, está bien.
-    if (raiz_->num_claves_ > 0) {
-        return;
-    }
-
-    // Si la raíz quedó vacía y además era hoja,
-    // entonces el árbol completo quedó vacío.
-    if (raiz_->es_hoja_) {
-        delete raiz_;
-        raiz_ = nullptr;
-        return;
-    }
-
-    // Si la raíz quedó vacía pero tiene hijos,
-    // el hijo 0 sube y se convierte en la nueva raíz.
-    Nodo<T> *vieja_raiz = raiz_;
-    raiz_ = raiz_->hijos_[0];
-
-    // Cortamos el enlace para que la vieja raíz ya no apunte al nuevo árbol.
-    vieja_raiz->hijos_[0] = nullptr;
-
-    // La nueva raíz no debe tener padre.
-    if (raiz_ != nullptr) {
-        raiz_->padre_ = nullptr;
-    }
-
-    // Borramos la raíz vieja.
-    delete vieja_raiz;
+    return minimo;
 }
 
+// ------------------------------------------------------- //
+/** \brief Determina si un nodo no raíz tiene menos claves que el mínimo permitido. */
+template <typename T>
+bool ArbolBEstrella<T>::esDeficiente(Nodo<T> *nodo) const {
+    if (nodo == raiz_) return false;
+    return nodo->num_claves_ < minimoClaves();
+}
+
+// ------------------------------------------------------- //
+/** \brief Obtiene el sucesor de una clave interna. */
+template <typename T>
+T ArbolBEstrella<T>::obtenerSucesor(Nodo<T> *nodo, int indice) const {
+    Nodo<T> *actual = nodo->hijos_[indice + 1];
+    while (!actual->es_hoja_) actual = actual->hijos_[0];
+
+    return actual->claves_[0];
+}
+
+// ------------------------------------------------------- //
+/** \brief Obtiene el predecesor de una clave interna. */
+template <typename T>
+T ArbolBEstrella<T>::obtenerPredecesor(Nodo<T> *nodo, int indice) const {
+    Nodo<T> *actual = nodo->hijos_[indice];
+    while (!actual->es_hoja_) actual = actual->hijos_[actual->num_claves_];
+
+    return actual->claves_[actual->num_claves_ - 1];
+}
+
+// ------------------------------------------------------- //
+/** \brief Repara el underflow de un hijo mediante redistribución o fusión. */
+template <typename T>
+void ArbolBEstrella<T>::corregirDeficiencia(Nodo<T> *nodo_padre, int indice_hijo) {
+    // Si no hay padre, no podemos corregir desde aquí.
+    if (nodo_padre == nullptr) {
+        return;
+    }
+
+    // indice_hijo debe ser un índice válido dentro de los hijos del padre.
+    // Un nodo con k claves tiene k + 1 hijos, por eso puede llegar hasta num_claves_.
+    if (indice_hijo < 0 || indice_hijo > nodo_padre->num_claves_) {
+        return;
+    }
+
+    // Nodo que quedó con menos claves de las permitidas.
+    Nodo<T> *hijo_deficiente = nodo_padre->hijos_[indice_hijo];
+
+    // Si no existe o realmente no está deficiente, no hacemos nada.
+    if (hijo_deficiente == nullptr || !esDeficiente(hijo_deficiente)) {
+        return;
+    }
+
+    // Mínimo de claves que debe conservar un nodo no raíz.
+    int minimo = minimoClaves();
+
+    // ============================================================
+    // 1. Intentar pedir prestado al hermano izquierdo.
+    // ============================================================
+    if (indice_hijo > 0) {
+        Nodo<T> *hermano_izq = nodo_padre->hijos_[indice_hijo - 1];
+
+        // Solo podemos pedir prestado si el hermano tiene más del mínimo.
+        // Si tiene exactamente el mínimo, no le podemos quitar una clave.
+        if (hermano_izq != nullptr && hermano_izq->num_claves_ > minimo) {
+            // Redistribuimos entre hermano izquierdo y nodo deficiente.
+            redistribuir(nodo_padre, hermano_izq, hijo_deficiente, indice_hijo - 1);
+            return;
+        }
+    }
+
+    // ============================================================
+    // 2. Intentar pedir prestado al hermano derecho.
+    // ============================================================
+    if (indice_hijo < nodo_padre->num_claves_) {
+        Nodo<T> *hermano_der = nodo_padre->hijos_[indice_hijo + 1];
+
+        // Igual que antes: solo puede prestar si tiene más del mínimo.
+        if (hermano_der != nullptr && hermano_der->num_claves_ > minimo) {
+            // Redistribuimos entre nodo deficiente y hermano derecho.
+            redistribuir(nodo_padre, hijo_deficiente, hermano_der, indice_hijo);
+            return;
+        }
+    }
+
+    // ============================================================
+    // 3. Si no se pudo prestar, intentamos fusión B*: 3 hijos -> 2 hijos.
+    // ============================================================
+    if (nodo_padre->num_claves_ >= 2) {
+        int indice_fusion = 0;
+
+        // Si el hijo deficiente es el primero,
+        // usamos la ventana de hijos 0, 1 y 2.
+        if (indice_hijo == 0) {
+            indice_fusion = 0;
+        }
+
+        // Si el hijo deficiente es el último,
+        // usamos la última ventana posible de tres hijos.
+        else if (indice_hijo == nodo_padre->num_claves_) {
+            indice_fusion = nodo_padre->num_claves_ - 2;
+        }
+
+        // Si está en medio,
+        // usamos hijo izquierdo, hijo deficiente y hijo derecho.
+        else {
+            indice_fusion = indice_hijo - 1;
+        }
+
+        // Aquí por fin usamos la función fusionar.
+        // Esta es la operación B* importante.
+        fusionar(nodo_padre, indice_fusion);
+        return;
+    }
+
+    // ============================================================
+    // 4. Caso especial: el padre solo tiene una clave.
+    // ============================================================
+    // Si el padre tiene una sola clave, solo tiene dos hijos.
+    // Entonces no hay tres hijos disponibles para hacer B* 3->2.
+    // En ese caso usamos fusión clásica 2->1.
+
+    if (indice_hijo > 0) {
+        // Fusionamos hermano izquierdo + hijo deficiente.
+        fusionarDosHijos(nodo_padre, indice_hijo - 1);
+    }
+    else {
+        // Fusionamos hijo deficiente + hermano derecho.
+        fusionarDosHijos(nodo_padre, indice_hijo);
+    }
+}
+
+// ------------------------------------------------------- //
+/** \brief Fusiona dos hijos usando la clave separadora del padre. */
 template <typename T>
 void ArbolBEstrella<T>::fusionarDosHijos(Nodo<T> *nodo_padre, int indice_hijo_izq) {
     // Validamos que el padre exista.
@@ -1202,28 +1241,60 @@ void ArbolBEstrella<T>::fusionarDosHijos(Nodo<T> *nodo_padre, int indice_hijo_iz
     delete der;
 }
 
+// ------------------------------------------------------- //
+/** \brief Reemplaza o elimina la raíz cuando queda vacía. */
 template <typename T>
-int ArbolBEstrella<T>::minimoClaves() const {
-    int minimo = (2 * orden_ - 1) / 3;
-
-    if (minimo < 1) {
-        minimo = 1;
-    }
-
-    return minimo;
-}
-
-template <typename T>
-void ArbolBEstrella<T>::vaciar() {
-    // Si el árbol ya está vacío, no hacemos nada.
+void ArbolBEstrella<T>::ajustarRaizDespuesDeEliminar() {
+    // Si no hay raíz, no hay nada que ajustar.
     if (raiz_ == nullptr) {
         return;
     }
 
-    // Destruye recursivamente todo el árbol desde la raíz.
-    destruir(raiz_);
+    // Si la raíz todavía tiene claves, está bien.
+    if (raiz_->num_claves_ > 0) {
+        return;
+    }
 
-    // Después de destruir, raiz_ debe quedar en nullptr
-    // para evitar que apunte a memoria ya liberada.
-    raiz_ = nullptr;
+    // Si la raíz quedó vacía y además era hoja,
+    // entonces el árbol completo quedó vacío.
+    if (raiz_->es_hoja_) {
+        delete raiz_;
+        raiz_ = nullptr;
+        return;
+    }
+
+    // Si la raíz quedó vacía pero tiene hijos,
+    // el hijo 0 sube y se convierte en la nueva raíz.
+    Nodo<T> *vieja_raiz = raiz_;
+    raiz_ = raiz_->hijos_[0];
+
+    // Cortamos el enlace para que la vieja raíz ya no apunte al nuevo árbol.
+    vieja_raiz->hijos_[0] = nullptr;
+
+    // La nueva raíz no debe tener padre.
+    if (raiz_ != nullptr) {
+        raiz_->padre_ = nullptr;
+    }
+
+    // Borramos la raíz vieja.
+    delete vieja_raiz;
 }
+
+// ============================================================================
+//  Impresión
+// ============================================================================
+
+/** \brief Imprime recursivamente un subárbol por niveles. */
+template <typename T>
+void ArbolBEstrella<T>::imprimir(Nodo<T> *nodo, int nivel) const {
+    if (nodo == nullptr) return;
+
+    for (int i = nodo->num_claves_ - 1; i >= 0; --i) {
+        imprimir(nodo->hijos_[i + 1], nivel + 1);
+        for (int j = 0; j < nivel; ++j) std::cout << "    ";
+        std::cout << nodo->claves_[i] << std::endl;
+    }
+
+    imprimir(nodo->hijos_[0], nivel + 1);
+}
+
