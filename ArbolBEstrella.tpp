@@ -85,26 +85,36 @@ template<typename T>
 Nodo<T>* ArbolBEstrella<T>::copiarNodo(Nodo<T> *nodo) {
     if (nodo == nullptr) return nullptr;
 
+    // Reservamos el nodo, si falla, lo reportamos como MemoriaInsuficiente
+    // (consistente con el resto del arbol, en vez de devolver nullptr en silencio.
     Nodo<T> *nuevo = nullptr;
     try {
         nuevo = new Nodo<T>(this->orden_, nodo->es_hoja_);
     }
-    catch (const std::bad_alloc& mensaje) {
-        std::cerr << "Falla de alojamiento de memoria:" << mensaje.what();
-        return nullptr;
-    }
-    nuevo->num_claves_ = nodo->num_claves_;
-
-    for (int i = 0; i < nodo->num_claves_; i++) {
-        nuevo->claves_[i] = nodo->claves_[i];
+    catch (const std::bad_alloc&) {
+        throw MemoriaInsuficiente();
     }
 
-    for (int i = 0; i < nuevo->num_claves_ + 1; i++) {
-        nuevo->hijos_[i] = copiarNodo(nodo->hijos_[i]);
+    // Copiamos claves e hijos. Si una copia recursiva falla a media construccion,
+    // liberamos el subarbol parcial para no dejar memoria colgada y propagamos.
+    try {
+        nuevo->num_claves_ = nodo->num_claves_;
 
-        if (nuevo->hijos_[i] != nullptr) {
-            nuevo->hijos_[i]->padre_ = nuevo;
+        for (int i = 0; i < nodo->num_claves_; i++) {
+            nuevo->claves_[i] = nodo->claves_[i];
         }
+
+        for (int i = 0; i < nuevo->num_claves_ + 1; i++) {
+            nuevo->hijos_[i] = copiarNodo(nodo->hijos_[i]);
+
+            if (nuevo->hijos_[i] != nullptr) {
+                nuevo->hijos_[i]->padre_ = nuevo;
+            }
+        }
+    }
+    catch (...) {
+        destruir(nuevo);   // libera el subarbol parcial ya construido
+        throw;             // propaga MemoriaInsuficiente hacia arriba
     }
 
     return nuevo;
@@ -943,6 +953,7 @@ void ArbolBEstrella<T>::corregirDeficiencia(Nodo<T> *nodo_padre, int indice_hijo
     // Si el padre tiene una sola clave, solo tiene dos hijos.
     // Entonces no hay tres hijos disponibles para hacer B* 3->2.
     // En ese caso usamos fusión clásica 2->1.
+
     if (indice_hijo > 0) {
         // Fusionamos hermano izquierdo + hijo deficiente.
         fusionarDosHijos(nodo_padre, indice_hijo - 1);
